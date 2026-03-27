@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/meshtastic_service.dart';
-import 'screens/role_selection_screen.dart';
 import 'screens/device_selection_screen.dart';
+import 'screens/role_selection_screen.dart';
 import 'screens/student/student_main_screen.dart';
 import 'screens/teacher/teacher_main_screen.dart';
 import 'screens/parent/parent_main_screen.dart';
@@ -75,7 +75,7 @@ class _SiriusEduAppState extends State<SiriusEduApp> {
   }
 }
 
-/// Pantalla de inicio que decide si ir a selección de rol o directo al rol guardado.
+/// Flujo: Startup → DeviceSelection (conectar nodo) → RoleSelection → Pantalla del rol
 class StartupScreen extends StatefulWidget {
   final MeshtasticService meshService;
 
@@ -89,25 +89,39 @@ class _StartupScreenState extends State<StartupScreen> {
   @override
   void initState() {
     super.initState();
-    _checkSavedRole();
+    _navigate();
   }
 
-  Future<void> _checkSavedRole() async {
+  Future<void> _navigate() async {
+    // Siempre ir primero a conectar el nodo
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+
     final prefs = await SharedPreferences.getInstance();
     final savedRole = prefs.getString('user_role');
-    final studentName = prefs.getString('user_name') ?? 'Estudiante';
+    final userName = prefs.getString('user_name') ?? 'Estudiante';
 
     if (!mounted) return;
 
+    // Determinar la pantalla destino después de conectar
+    Widget afterConnection;
     if (savedRole != null) {
-      _navigateToRole(savedRole, studentName);
+      // Ya tiene rol guardado → ir directo a su pantalla
+      afterConnection = _buildRoleScreen(savedRole, userName);
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => RoleSelectionScreen(meshService: widget.meshService),
-        ),
-      );
+      // No tiene rol → ir a selección de rol
+      afterConnection = RoleSelectionScreen(meshService: widget.meshService);
     }
+
+    // SIEMPRE pasar primero por DeviceSelection
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => DeviceSelectionScreen(
+          meshService: widget.meshService,
+          nextScreen: afterConnection,
+        ),
+      ),
+    );
   }
 
   Widget _buildRoleScreen(String role, String userName) {
@@ -125,19 +139,6 @@ class _StartupScreenState extends State<StartupScreen> {
     }
   }
 
-  void _navigateToRole(String role, String userName) {
-    final roleScreen = _buildRoleScreen(role, userName);
-    // Pasar por selección de dispositivo BLE (se puede omitir para modo offline)
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => DeviceSelectionScreen(
-          meshService: widget.meshService,
-          nextScreen: roleScreen,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
@@ -147,19 +148,11 @@ class _StartupScreenState extends State<StartupScreen> {
           children: [
             Icon(Icons.school, size: 64, color: Color(0xFF27AE60)),
             SizedBox(height: 16),
-            Text(
-              'Sirius Edu',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C3E50),
-              ),
-            ),
+            Text('Sirius Edu',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50))),
             SizedBox(height: 8),
-            Text(
-              'Conectando educacion',
-              style: TextStyle(fontSize: 16, color: Color(0xFF7F8C8D)),
-            ),
+            Text('Conectando educacion',
+                style: TextStyle(fontSize: 16, color: Color(0xFF7F8C8D))),
             SizedBox(height: 32),
             CircularProgressIndicator(color: Color(0xFF27AE60)),
           ],

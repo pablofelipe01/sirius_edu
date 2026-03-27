@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/meshtastic_service.dart';
-import 'device_selection_screen.dart';
 import 'student/student_main_screen.dart';
 import 'teacher/teacher_main_screen.dart';
 import 'parent/parent_main_screen.dart';
@@ -78,13 +77,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
       default:
         return;
     }
+    // Nodo ya está conectado — ir directo a la pantalla del rol
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => DeviceSelectionScreen(
-          meshService: widget.meshService,
-          nextScreen: roleScreen,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => roleScreen),
     );
   }
 

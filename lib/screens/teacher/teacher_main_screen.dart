@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/meshtastic_service.dart';
+import '../settings_screen.dart';
+import '../device_selection_screen.dart';
 import 'create_lesson_screen.dart';
 import 'students_screen.dart';
 import 'submissions_screen.dart';
@@ -27,7 +29,26 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
       StudentsScreen(meshService: widget.meshService),
       SubmissionsScreen(meshService: widget.meshService),
       TeacherAIScreen(meshService: widget.meshService, teacherName: widget.teacherName),
+      SettingsScreen(
+        meshService: widget.meshService,
+        onDeviceChange: _goToDeviceSelection,
+        onDisconnect: _goToDeviceSelection,
+      ),
     ];
+  }
+
+  void _goToDeviceSelection() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => DeviceSelectionScreen(
+          meshService: widget.meshService,
+          nextScreen: TeacherMainScreen(
+            meshService: widget.meshService,
+            teacherName: widget.teacherName,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -59,6 +80,7 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
           NavigationDestination(icon: Icon(Icons.people), label: 'Alumnos'),
           NavigationDestination(icon: Icon(Icons.grading), label: 'Entregas'),
           NavigationDestination(icon: Icon(Icons.smart_toy), label: 'Asistente IA'),
+          NavigationDestination(icon: Icon(Icons.settings), label: 'Ajustes'),
         ],
       ),
     );

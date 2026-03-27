@@ -54,6 +54,7 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _keepAliveTimer;
   Timer? _reconnectTimer;
   String? _savedDeviceId;
+  String? _savedDeviceName;
 
   // --- Getters ---
   AppConnectionStatus get status => _status;
@@ -74,12 +75,53 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   Stream<Map<String, dynamic>> get evaluationStream => _evaluationController.stream;
   Stream<Map<String, String>> get aiResponseStream => _aiResponseController.stream;
 
-  static const int gatewayNodeId = 0x49b54674;
+  // --- Info del dispositivo conectado ---
+  String? get connectedDeviceName => _savedDeviceName;
+  String? get connectedDeviceMac => _savedDeviceId;
+  int? get connectedNodeBatteryLevel {
+    if (_client.myNodeInfo == null) return null;
+    final myNum = _client.myNodeInfo!.myNodeNum;
+    final node = _knownNodes.where((n) => n.nodeId == myNum).firstOrNull;
+    return node?.batteryLevel;
+  }
+
+  int _gatewayNodeId = 0x49b54674;
+  static const int defaultGatewayNodeId = 0x49b54674;
+  int get gatewayNodeId => _gatewayNodeId;
 
   MeshtasticService() {
     WidgetsBinding.instance.addObserver(this);
     _knownNodes.addAll(_preloadedNodes);
+    _loadSavedGateway();
     _initializeClient();
+  }
+
+  Future<void> _loadSavedGateway() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getInt('gateway_node_id');
+    if (saved != null) _gatewayNodeId = saved;
+    _savedDeviceName = prefs.getString('saved_device_name');
+  }
+
+  Future<void> saveGatewayNodeId(int nodeId) async {
+    _gatewayNodeId = nodeId;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('gateway_node_id', nodeId);
+    notifyListeners();
+  }
+
+  Future<void> disconnectAndClear() async {
+    _keepAliveTimer?.cancel();
+    try {
+      await _client.disconnect();
+    } catch (_) {}
+    _status = AppConnectionStatus.disconnected;
+    _savedDeviceId = null;
+    _savedDeviceName = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('saved_device_id');
+    await prefs.remove('saved_device_name');
+    notifyListeners();
   }
 
   Future<void> _initializeClient() async {
@@ -112,9 +154,11 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     try {
       await _client.connectToDevice(device);
       _savedDeviceId = device.remoteId.str;
+      _savedDeviceName = device.platformName.isNotEmpty ? device.platformName : device.remoteId.str;
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('saved_device_id', _savedDeviceId!);
+      await prefs.setString('saved_device_name', _savedDeviceName!);
 
       _status = AppConnectionStatus.connected;
       _startKeepAlive();

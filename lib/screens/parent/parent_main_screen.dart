@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/meshtastic_service.dart';
 import '../../widgets/progress_bar_widget.dart';
+import '../settings_screen.dart';
+import '../device_selection_screen.dart';
 
 class ParentMainScreen extends StatelessWidget {
   final MeshtasticService meshService;
@@ -18,13 +20,38 @@ class ParentMainScreen extends StatelessWidget {
           ListenableBuilder(
             listenable: meshService,
             builder: (context, _) => Padding(
-              padding: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.only(right: 4),
               child: Icon(
                 meshService.isConnected ? Icons.cell_tower : Icons.signal_cellular_off,
                 color: meshService.isConnected ? Colors.white : Colors.white54,
                 size: 20,
               ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Ajustes'), backgroundColor: const Color(0xFFE67E22)),
+                  body: SettingsScreen(
+                    meshService: meshService,
+                    onDeviceChange: () => Navigator.pushReplacement(context, MaterialPageRoute(
+                      builder: (_) => DeviceSelectionScreen(
+                        meshService: meshService,
+                        nextScreen: ParentMainScreen(meshService: meshService, parentName: parentName),
+                      ),
+                    )),
+                    onDisconnect: () => Navigator.pushReplacement(context, MaterialPageRoute(
+                      builder: (_) => DeviceSelectionScreen(
+                        meshService: meshService,
+                        nextScreen: ParentMainScreen(meshService: meshService, parentName: parentName),
+                      ),
+                    )),
+                  ),
+                ),
+              ));
+            },
           ),
         ],
       ),

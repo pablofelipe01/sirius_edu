@@ -13,7 +13,7 @@ class StudentsScreen extends StatelessWidget {
       listenable: meshService,
       builder: (context, _) {
         final nodes = meshService.knownNodes
-            .where((n) => n.nodeId != MeshtasticService.gatewayNodeId)
+            .where((n) => n.nodeId != meshService.gatewayNodeId)
             .toList();
 
         if (nodes.isEmpty) {

@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'services/meshtastic_service.dart';
 import 'screens/device_selection_screen.dart';
 import 'screens/role_selection_screen.dart';
-import 'screens/student/student_main_screen.dart';
-import 'screens/teacher/teacher_main_screen.dart';
-import 'screens/parent/parent_main_screen.dart';
-import 'screens/supervisor/dashboard_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -93,50 +88,20 @@ class _StartupScreenState extends State<StartupScreen> {
   }
 
   Future<void> _navigate() async {
-    // Siempre ir primero a conectar el nodo
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final savedRole = prefs.getString('user_role');
-    final userName = prefs.getString('user_name') ?? 'Estudiante';
-
-    if (!mounted) return;
-
-    // Determinar la pantalla destino después de conectar
-    Widget afterConnection;
-    if (savedRole != null) {
-      // Ya tiene rol guardado → ir directo a su pantalla
-      afterConnection = _buildRoleScreen(savedRole, userName);
-    } else {
-      // No tiene rol → ir a selección de rol
-      afterConnection = RoleSelectionScreen(meshService: widget.meshService);
-    }
-
-    // SIEMPRE pasar primero por DeviceSelection
+    // SIEMPRE ir a DeviceSelection primero.
+    // Después de conectar, consulta el roster al gateway para saber quién eres.
+    // Fallback: si no hay roster, va a selección manual de rol.
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => DeviceSelectionScreen(
           meshService: widget.meshService,
-          nextScreen: afterConnection,
+          nextScreen: RoleSelectionScreen(meshService: widget.meshService),
         ),
       ),
     );
-  }
-
-  Widget _buildRoleScreen(String role, String userName) {
-    switch (role) {
-      case 'student':
-        return StudentMainScreen(meshService: widget.meshService, studentName: userName);
-      case 'teacher':
-        return TeacherMainScreen(meshService: widget.meshService, teacherName: userName);
-      case 'parent':
-        return ParentMainScreen(meshService: widget.meshService, parentName: userName);
-      case 'supervisor':
-        return DashboardScreen(meshService: widget.meshService);
-      default:
-        return RoleSelectionScreen(meshService: widget.meshService);
-    }
   }
 
   @override

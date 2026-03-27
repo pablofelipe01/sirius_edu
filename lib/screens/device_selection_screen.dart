@@ -110,12 +110,7 @@ class _DeviceSelectionScreenState extends State<DeviceSelectionScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Conectar nodo LoRa'),
-        actions: [
-          TextButton(
-            onPressed: _skipConnection,
-            child: const Text('Omitir', style: TextStyle(color: Colors.white70)),
-          ),
-        ],
+        actions: const [],
       ),
       body: _connecting
           ? const Center(

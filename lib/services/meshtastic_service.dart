@@ -40,6 +40,11 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
 
   Set<int> _processedPacketIds = {};
 
+  // Reensamblaje de fragmentos [N/M] del gateway
+  // Clave: fromNodeId, Valor: {fragmentos ordenados}
+  final Map<int, List<String?>> _pendingBracketFragments = {};
+  final Map<int, DateTime> _bracketFragmentTimestamps = {};
+
   final List<MeshNode> _preloadedNodes = [
     MeshNode(nodeId: 0x49b54674, nodeName: 'Gateway Jetson'),
   ];
@@ -245,6 +250,18 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     if (payload == null || payload.isEmpty) return;
     final text = utf8.decode(payload, allowMalformed: true);
 
+    // Reensamblaje de fragmentos [N/M] del gateway
+    final bracketMatch = RegExp(r'^\[(\d+)/(\d+)\] (.*)').firstMatch(text);
+    if (bracketMatch != null) {
+      _handleBracketFragment(
+        int.parse(bracketMatch.group(1)!),
+        int.parse(bracketMatch.group(2)!),
+        bracketMatch.group(3)!,
+        packet.from,
+      );
+      return;
+    }
+
     if (text.startsWith('FRAG|')) {
       _handleFragment(text, packet.from);
     } else if (text.startsWith('LECCION|')) {
@@ -264,6 +281,82 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Maneja fragmentos con formato [N/M] del gateway (send_private_message)
+  void _handleBracketFragment(int fragNum, int total, String data, int fromNode) {
+    // Limpiar fragmentos viejos (>60s)
+    final now = DateTime.now();
+    _bracketFragmentTimestamps.removeWhere(
+      (key, ts) => now.difference(ts).inSeconds > 60,
+    );
+    _pendingBracketFragments.removeWhere(
+      (key, _) => !_bracketFragmentTimestamps.containsKey(key),
+    );
+
+    // Inicializar lista si es nuevo
+    if (!_pendingBracketFragments.containsKey(fromNode)) {
+      _pendingBracketFragments[fromNode] = List<String?>.filled(total, null);
+    }
+    _bracketFragmentTimestamps[fromNode] = now;
+
+    final fragments = _pendingBracketFragments[fromNode]!;
+    // Expandir si total cambió
+    if (fragments.length < total) {
+      _pendingBracketFragments[fromNode] = [
+        ...fragments,
+        ...List<String?>.filled(total - fragments.length, null),
+      ];
+    }
+    _pendingBracketFragments[fromNode]![fragNum - 1] = data; // 1-based → 0-based
+
+    // Verificar si tenemos todos
+    final frags = _pendingBracketFragments[fromNode]!;
+    if (frags.every((f) => f != null)) {
+      final reassembled = frags.join('');
+      _pendingBracketFragments.remove(fromNode);
+      _bracketFragmentTimestamps.remove(fromNode);
+      // Procesar mensaje completo
+      _processRouting(reassembled, fromNode);
+    }
+  }
+
+  /// Rutea un mensaje completo (ya reensamblado o no fragmentado)
+  void _processRouting(String text, int fromNode) {
+    if (text.startsWith('RESPUESTA_IA|')) {
+      _handleAIResponse(text);
+    } else if (text.startsWith('LECCION|')) {
+      _handleLessonMessage(text);
+    } else if (text.startsWith('TAREA|')) {
+      _handleAssignmentMessage(text);
+    } else if (text.startsWith('EVAL_IA|')) {
+      _handleAIEvaluation(text);
+    } else if (text.startsWith('EVAL_PROF|')) {
+      _handleTeacherEvaluation(text);
+    } else if (text.startsWith('SYNC_RES|')) {
+      _handleSyncResponse(text);
+    } else if (text.startsWith('ROSTER_RES|') || text.startsWith('ROSTER_PIN_OK|') || text.startsWith('ROSTER_PIN_FAIL|')) {
+      // Estos se manejan como chat messages para que el DeviceSelectionScreen los reciba via messageStream
+      final message = ChatMessage(
+        messageText: text, fromNodeId: fromNode,
+        fromNodeName: _getNodeName(fromNode), timestamp: DateTime.now(),
+        channel: 0, isDirectMessage: true, isMine: false,
+      );
+      _messageHistory.add(message);
+      _messageController.add(message);
+      notifyListeners();
+    } else {
+      // Chat normal genérico — crear ChatMessage
+      final message = ChatMessage(
+        messageText: text, fromNodeId: fromNode,
+        fromNodeName: _getNodeName(fromNode), timestamp: DateTime.now(),
+        channel: 0, isDirectMessage: true, isMine: false,
+      );
+      _messageHistory.add(message);
+      _unreadChatCount++;
+      _messageController.add(message);
+      notifyListeners();
+    }
+  }
+
   void _handleFragment(String text, int fromNode) {
     final reassembled = _fragmentService.receiveFragment(text);
     if (reassembled != null) {
@@ -272,15 +365,7 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _processReassembledMessage(String text, int fromNode) {
-    if (text.startsWith('RESPUESTA_IA|')) {
-      _handleAIResponse(text);
-    } else if (text.startsWith('LECCION|')) {
-      _handleLessonMessage(text);
-    } else if (text.startsWith('EVAL_IA|')) {
-      _handleAIEvaluation(text);
-    } else if (text.startsWith('SYNC_RES|')) {
-      _handleSyncResponse(text);
-    }
+    _processRouting(text, fromNode);
   }
 
   void _handleLessonMessage(String text) {

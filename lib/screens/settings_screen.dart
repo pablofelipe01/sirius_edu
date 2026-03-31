@@ -207,7 +207,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(fontSize: 13, color: Color(0xFF7F8C8D))),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<int>(
-                    initialValue: _selectedGatewayNodeId,
+                    value: nodes.any((n) => n.nodeId == _selectedGatewayNodeId)
+                        ? _selectedGatewayNodeId
+                        : null,
+                    hint: const Text('Selecciona el gateway'),
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),

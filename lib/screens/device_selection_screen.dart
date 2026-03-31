@@ -465,7 +465,10 @@ class _DeviceSelectionScreenState extends State<DeviceSelectionScreen> {
                     const SizedBox(height: 8),
                     if (nodes.isNotEmpty)
                       DropdownButtonFormField<int>(
-                        initialValue: _selectedGatewayNodeId,
+                        value: nodes.any((n) => n.nodeId == _selectedGatewayNodeId)
+                            ? _selectedGatewayNodeId
+                            : null,
+                        hint: const Text('Selecciona el gateway'),
                         decoration: const InputDecoration(
                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),

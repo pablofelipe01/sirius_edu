@@ -45,9 +45,7 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   final Map<int, List<String?>> _pendingBracketFragments = {};
   final Map<int, DateTime> _bracketFragmentTimestamps = {};
 
-  final List<MeshNode> _preloadedNodes = [
-    MeshNode(nodeId: 0x49b54674, nodeName: 'Gateway Jetson'),
-  ];
+  final List<MeshNode> _preloadedNodes = [];
 
   // --- Streams ---
   final _messageController = StreamController<ChatMessage>.broadcast();
@@ -90,9 +88,8 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     return node?.batteryLevel;
   }
 
-  int _gatewayNodeId = 0x49b54674;
-  static const int defaultGatewayNodeId = 0x49b54674;
-  int get gatewayNodeId => _gatewayNodeId;
+  int? _gatewayNodeId;
+  int? get gatewayNodeId => _gatewayNodeId;
 
   MeshtasticService() {
     WidgetsBinding.instance.addObserver(this);
@@ -500,7 +497,8 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> sendToGateway(String text) async {
-    await sendMessage(text, destinationId: gatewayNodeId);
+    if (_gatewayNodeId == null) return;
+    await sendMessage(text, destinationId: _gatewayNodeId!);
   }
 
   Future<void> sendAIQuestion(String studentId, String contextId, String question) async {

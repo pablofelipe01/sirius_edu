@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../../services/meshtastic_service.dart';
 import '../settings_screen.dart';
 import '../device_selection_screen.dart';
-import 'create_lesson_screen.dart';
+import '../chat_screen.dart';
 import 'students_screen.dart';
-import 'submissions_screen.dart';
+import 'teacher_questions_screen.dart';
 import 'teacher_ai_screen.dart';
 
 class TeacherMainScreen extends StatefulWidget {
@@ -25,9 +25,9 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
   void initState() {
     super.initState();
     _screens = [
-      CreateLessonScreen(meshService: widget.meshService),
       StudentsScreen(meshService: widget.meshService),
-      SubmissionsScreen(meshService: widget.meshService),
+      TeacherQuestionsScreen(meshService: widget.meshService, teacherName: widget.teacherName),
+      ChatScreen(meshService: widget.meshService, userName: widget.teacherName),
       TeacherAIScreen(meshService: widget.meshService, teacherName: widget.teacherName),
       SettingsScreen(
         meshService: widget.meshService,
@@ -42,10 +42,7 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
       MaterialPageRoute(
         builder: (_) => DeviceSelectionScreen(
           meshService: widget.meshService,
-          nextScreen: TeacherMainScreen(
-            meshService: widget.meshService,
-            teacherName: widget.teacherName,
-          ),
+          nextScreen: TeacherMainScreen(meshService: widget.meshService, teacherName: widget.teacherName),
         ),
       ),
     );
@@ -72,16 +69,33 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
         ],
       ),
       body: _screens[_currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.add_circle), label: 'Lecciones'),
-          NavigationDestination(icon: Icon(Icons.people), label: 'Alumnos'),
-          NavigationDestination(icon: Icon(Icons.grading), label: 'Entregas'),
-          NavigationDestination(icon: Icon(Icons.smart_toy), label: 'Asistente IA'),
-          NavigationDestination(icon: Icon(Icons.settings), label: 'Ajustes'),
-        ],
+      bottomNavigationBar: ListenableBuilder(
+        listenable: widget.meshService,
+        builder: (context, _) => NavigationBar(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (i) => setState(() => _currentIndex = i),
+          destinations: [
+            const NavigationDestination(icon: Icon(Icons.people), label: 'Alumnos'),
+            NavigationDestination(
+              icon: Badge(
+                label: Text('${widget.meshService.pendingQuestions.length}'),
+                isLabelVisible: widget.meshService.pendingQuestions.isNotEmpty,
+                child: const Icon(Icons.help_outline),
+              ),
+              label: 'Preguntas',
+            ),
+            NavigationDestination(
+              icon: Badge(
+                label: Text('${widget.meshService.unreadChatCount}'),
+                isLabelVisible: widget.meshService.unreadChatCount > 0,
+                child: const Icon(Icons.chat_bubble_outline),
+              ),
+              label: 'Chat',
+            ),
+            const NavigationDestination(icon: Icon(Icons.smart_toy), label: 'Asistente IA'),
+            const NavigationDestination(icon: Icon(Icons.settings), label: 'Ajustes'),
+          ],
+        ),
       ),
     );
   }

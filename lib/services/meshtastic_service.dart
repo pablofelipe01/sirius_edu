@@ -47,12 +47,17 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
 
   final List<MeshNode> _preloadedNodes = [];
 
+  // --- Preguntas pendientes (profesor) ---
+  final List<Map<String, String>> _pendingQuestions = [];
+
   // --- Streams ---
   final _messageController = StreamController<ChatMessage>.broadcast();
   final _lessonController = StreamController<Lesson>.broadcast();
   final _assignmentController = StreamController<Assignment>.broadcast();
   final _evaluationController = StreamController<Map<String, dynamic>>.broadcast();
   final _aiResponseController = StreamController<Map<String, String>>.broadcast();
+  final _pendingQuestionController = StreamController<Map<String, String>>.broadcast();
+  final _syncStatusController = StreamController<String>.broadcast();
 
   Timer? _keepAliveTimer;
   Timer? _reconnectTimer;
@@ -77,6 +82,9 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   Stream<Assignment> get assignmentStream => _assignmentController.stream;
   Stream<Map<String, dynamic>> get evaluationStream => _evaluationController.stream;
   Stream<Map<String, String>> get aiResponseStream => _aiResponseController.stream;
+  Stream<Map<String, String>> get pendingQuestionStream => _pendingQuestionController.stream;
+  Stream<String> get syncStatusStream => _syncStatusController.stream;
+  List<Map<String, String>> get pendingQuestions => _pendingQuestions;
 
   // --- Info del dispositivo conectado ---
   String? get connectedDeviceName => _savedDeviceName;
@@ -261,20 +269,9 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
 
     if (text.startsWith('FRAG|')) {
       _handleFragment(text, packet.from);
-    } else if (text.startsWith('LECCION|')) {
-      _handleLessonMessage(text);
-    } else if (text.startsWith('TAREA|')) {
-      _handleAssignmentMessage(text);
-    } else if (text.startsWith('EVAL_IA|')) {
-      _handleAIEvaluation(text);
-    } else if (text.startsWith('EVAL_PROF|')) {
-      _handleTeacherEvaluation(text);
-    } else if (text.startsWith('RESPUESTA_IA|')) {
-      _handleAIResponse(text);
-    } else if (text.startsWith('SYNC_RES|')) {
-      _handleSyncResponse(text);
     } else {
-      _handleChatMessage(text, packet);
+      // Todo pasa por _processRouting (maneja todos los prefijos)
+      _processRouting(text, packet.from);
     }
   }
 
@@ -320,18 +317,25 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   void _processRouting(String text, int fromNode) {
     if (text.startsWith('RESPUESTA_IA|')) {
       _handleAIResponse(text);
-    } else if (text.startsWith('LECCION|')) {
+    } else if (text.startsWith('LECCION|') || text.startsWith('LECCION_FULL|')) {
       _handleLessonMessage(text);
     } else if (text.startsWith('TAREA|')) {
       _handleAssignmentMessage(text);
     } else if (text.startsWith('EVAL_IA|')) {
       _handleAIEvaluation(text);
-    } else if (text.startsWith('EVAL_PROF|')) {
-      _handleTeacherEvaluation(text);
     } else if (text.startsWith('SYNC_RES|')) {
       _handleSyncResponse(text);
+    } else if (text.startsWith('PREGUNTA_PROF_OK|')) {
+      // Confirmación de pregunta al profesor enviada
+      _syncStatusController.add(text.split('|').skip(1).join('|'));
+      notifyListeners();
+    } else if (text.startsWith('PREGUNTA_PEND|')) {
+      // Pregunta pendiente para el profesor
+      _handlePendingQuestion(text);
+    } else if (text.startsWith('RESP_PROF_OK|')) {
+      _syncStatusController.add('Respuesta enviada');
+      notifyListeners();
     } else if (text.startsWith('ROSTER_RES|') || text.startsWith('ROSTER_PIN_OK|') || text.startsWith('ROSTER_PIN_FAIL|')) {
-      // Estos se manejan como chat messages para que el DeviceSelectionScreen los reciba via messageStream
       final message = ChatMessage(
         messageText: text, fromNodeId: fromNode,
         fromNodeName: _getNodeName(fromNode), timestamp: DateTime.now(),
@@ -341,7 +345,7 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
       _messageController.add(message);
       notifyListeners();
     } else {
-      // Chat normal genérico — crear ChatMessage
+      // Chat normal — crear ChatMessage
       final message = ChatMessage(
         messageText: text, fromNodeId: fromNode,
         fromNodeName: _getNodeName(fromNode), timestamp: DateTime.now(),
@@ -403,16 +407,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  void _handleTeacherEvaluation(String text) {
-    final parts = text.split('|');
-    if (parts.length < 5) return;
-    _evaluationController.add({
-      'assignment_id': parts[1], 'student_id': parts[2],
-      'criteria': parts[3], 'grade': parts[4],
-    });
-    notifyListeners();
-  }
-
   void _handleAIResponse(String text) {
     final parts = text.split('|');
     if (parts.length < 3) return;
@@ -424,20 +418,25 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _handleSyncResponse(String text) {
-    // SYNC_RES — handled as needed
+    // SYNC_RES|tipo|... — notificar estado
+    final parts = text.split('|');
+    if (parts.length >= 3) {
+      _syncStatusController.add(parts.sublist(1).join('|'));
+    }
+    notifyListeners();
   }
 
-  void _handleChatMessage(String text, MeshPacketWrapper packet) {
-    final nodeName = _getNodeName(packet.from);
-    final message = ChatMessage(
-      messageText: text, fromNodeId: packet.from, fromNodeName: nodeName,
-      timestamp: DateTime.now(), channel: packet.channel,
-      toNodeId: packet.to == 0xFFFFFFFF ? null : packet.to,
-      isDirectMessage: packet.to != 0xFFFFFFFF, isMine: false,
-    );
-    _messageHistory.add(message);
-    _unreadChatCount++;
-    _messageController.add(message);
+  void _handlePendingQuestion(String text) {
+    // PREGUNTA_PEND|question_id|student_name|question_text
+    final parts = text.split('|');
+    if (parts.length < 4) return;
+    final q = {
+      'id': parts[1],
+      'student_name': parts[2],
+      'question': parts.sublist(3).join('|'),
+    };
+    _pendingQuestions.add(q);
+    _pendingQuestionController.add(q);
     notifyListeners();
   }
 
@@ -527,6 +526,22 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     await sendToGateway('PERFIL_UPDATE|$studentId|$field|$value');
   }
 
+  /// Solicitar sync de datos del gateway (Supabase)
+  Future<void> requestSync(String tipo, [String? extra]) async {
+    final msg = extra != null ? 'SYNC_REQ|$tipo|$extra' : 'SYNC_REQ|$tipo';
+    await sendToGateway(msg);
+  }
+
+  /// Alumno pregunta al profesor (va a Supabase)
+  Future<void> sendQuestionToTeacher(String studentName, String question) async {
+    await sendToGateway('PREGUNTA_PROF|$studentName|$question');
+  }
+
+  /// Profesor responde pregunta de alumno
+  Future<void> respondToQuestion(String questionId, String response) async {
+    await sendToGateway('RESP_PROF|$questionId|$response');
+  }
+
   Future<void> sendChatMessage(String text, {int? destinationId, int channel = 0}) async {
     await sendMessage(text, destinationId: destinationId, channel: channel);
     final message = ChatMessage(
@@ -563,6 +578,8 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     _assignmentController.close();
     _evaluationController.close();
     _aiResponseController.close();
+    _pendingQuestionController.close();
+    _syncStatusController.close();
     _client.disconnect();
     _storage.close();
     super.dispose();

@@ -2,17 +2,39 @@ import 'package:flutter/material.dart';
 import '../../services/meshtastic_service.dart';
 import '../../widgets/lesson_card.dart';
 
-class LessonScreen extends StatelessWidget {
+class LessonScreen extends StatefulWidget {
   final MeshtasticService meshService;
-
   const LessonScreen({super.key, required this.meshService});
+
+  @override
+  State<LessonScreen> createState() => _LessonScreenState();
+}
+
+class _LessonScreenState extends State<LessonScreen> {
+  bool _syncing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestLessons();
+  }
+
+  void _requestLessons() {
+    if (!widget.meshService.isConnected) return;
+    setState(() => _syncing = true);
+    widget.meshService.requestSync('lessons');
+    // El gateway responde con LECCION| que se maneja en MeshtasticService
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted) setState(() => _syncing = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: meshService,
+      listenable: widget.meshService,
       builder: (context, _) {
-        final lesson = meshService.activeLesson;
+        final lesson = widget.meshService.activeLesson;
 
         if (lesson == null) {
           return Center(
@@ -26,15 +48,19 @@ class LessonScreen extends StatelessWidget {
                   const Text('No hay leccion activa',
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF7F8C8D))),
                   const SizedBox(height: 8),
-                  const Text('Tu profesor enviara una leccion pronto',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Color(0xFF95A5A6))),
-                  const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: () => meshService.sendToGateway('SYNC_REQ|lesson_active|0'),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Buscar leccion'),
+                  Text(
+                    _syncing ? 'Buscando lecciones...' : 'Pide tus lecciones al gateway',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF95A5A6)),
                   ),
+                  const SizedBox(height: 24),
+                  _syncing
+                      ? const CircularProgressIndicator(color: Color(0xFF27AE60))
+                      : OutlinedButton.icon(
+                          onPressed: _requestLessons,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Buscar lecciones'),
+                        ),
                 ],
               ),
             ),
@@ -46,13 +72,7 @@ class LessonScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LessonCard(
-                lesson: lesson,
-                onAskTutor: () {
-                  // Navegar al tab de tutor (index 1 en StudentMainScreen)
-                  // Se maneja via el parent NavigationBar
-                },
-              ),
+              LessonCard(lesson: lesson),
               if (lesson.fullContent.isNotEmpty && lesson.fullContent != lesson.summary) ...[
                 const SizedBox(height: 20),
                 Card(
@@ -66,7 +86,7 @@ class LessonScreen extends StatelessWidget {
                           children: [
                             Icon(Icons.article, color: Color(0xFF2980B9)),
                             SizedBox(width: 8),
-                            Text('Contenido de la leccion',
+                            Text('Contenido',
                                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF2C3E50))),
                           ],
                         ),
@@ -78,18 +98,12 @@ class LessonScreen extends StatelessWidget {
                   ),
                 ),
               ],
-              if (meshService.assignments.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.assignment),
-                  label: Text('Tienes ${meshService.assignments.length} tarea(s)'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE67E22),
-                    minimumSize: const Size(double.infinity, 48),
-                  ),
-                ),
-              ],
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _requestLessons,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Actualizar lecciones'),
+              ),
             ],
           ),
         );

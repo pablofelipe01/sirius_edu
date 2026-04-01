@@ -27,6 +27,10 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         _evaluations[eval['assignment_id'] ?? ''] = eval;
       });
     });
+    // Auto-sync tareas al abrir
+    if (widget.meshService.isConnected) {
+      widget.meshService.requestSync('assignments');
+    }
   }
 
   @override

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { Lesson } from '@/lib/types'
 
 const subjectColors: Record<string, string> = {
@@ -19,20 +20,25 @@ export default function LessonCard({ lesson }: { lesson: Lesson }) {
   const subjectName = subjectNames[lesson.subject_code] || lesson.subject_code
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <span className={`text-xs font-medium px-2 py-1 rounded-full ${badgeClass}`}>
-            {subjectName}
-          </span>
-          <span className="text-xs text-gray-400 ml-2">Grado {lesson.grade} - Semana {lesson.week_number}</span>
+    <Link href={`/lecciones/${lesson.id}`}>
+      <div className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md hover:border-green-200 transition-all cursor-pointer">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <span className={`text-xs font-medium px-2 py-1 rounded-full ${badgeClass}`}>
+              {subjectName}
+            </span>
+            <span className="text-xs text-gray-400 ml-2">Grado {lesson.grade} - Semana {lesson.week_number}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {lesson.is_active && (
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Activa</span>
+            )}
+            <span className="text-xs text-gray-400 hover:text-green-600">Editar &rarr;</span>
+          </div>
         </div>
-        {lesson.is_active && (
-          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Activa</span>
-        )}
+        <h3 className="font-semibold text-gray-800 mb-1">{lesson.title}</h3>
+        <p className="text-sm text-gray-500 line-clamp-2">{lesson.summary}</p>
       </div>
-      <h3 className="font-semibold text-gray-800 mb-1">{lesson.title}</h3>
-      <p className="text-sm text-gray-500 line-clamp-2">{lesson.summary}</p>
-    </div>
+    </Link>
   )
 }

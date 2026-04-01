@@ -15,7 +15,7 @@ const subjectNames: Record<string, string> = {
 }
 
 export default function LessonCard({ lesson }: { lesson: Lesson }) {
-  const badgeClass = subjectColors[lesson.subject_code] || 'bg-gray-100 text-gray-700'
+  const badgeClass = subjectColors[lesson.subject_code] || 'bg-gray-100 text-green-400'
   const subjectName = subjectNames[lesson.subject_code] || lesson.subject_code
 
   return (

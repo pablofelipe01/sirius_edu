@@ -42,7 +42,7 @@ export default function PreguntasPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">
+      <h1 className="text-2xl font-bold text-green-500 mb-6">
         Preguntas de alumnos
         {pending.length > 0 && (
           <span className="ml-2 text-sm bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
@@ -63,7 +63,7 @@ export default function PreguntasPage() {
                     Grado {(q.roster as Record<string, string>)?.grade} - {new Date(q.created_at).toLocaleDateString('es-CO')}
                   </span>
                 </div>
-                <p className="text-gray-700 mb-3">{q.question}</p>
+                <p className="text-green-400 mb-3">{q.question}</p>
                 <div className="flex gap-2">
                   <input
                     value={response[q.id] || ''}
@@ -90,7 +90,7 @@ export default function PreguntasPage() {
             {answered.map(q => (
               <div key={q.id} className="bg-white rounded-xl border border-gray-100 p-4 opacity-80">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-gray-700">{(q.roster as Record<string, string>)?.name}</span>
+                  <span className="font-medium text-green-400">{(q.roster as Record<string, string>)?.name}</span>
                   <span className="text-xs text-gray-400">{new Date(q.created_at).toLocaleDateString('es-CO')}</span>
                 </div>
                 <p className="text-gray-600 text-sm">{q.question}</p>

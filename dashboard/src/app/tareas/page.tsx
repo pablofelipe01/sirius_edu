@@ -14,7 +14,7 @@ export default async function TareasPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Tareas</h1>
+      <h1 className="text-2xl font-bold text-green-500 mb-6">Tareas</h1>
 
       {assignments && assignments.length > 0 ? (
         <div className="space-y-3">

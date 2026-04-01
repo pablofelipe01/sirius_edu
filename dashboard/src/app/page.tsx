@@ -14,7 +14,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-green-500 mb-6">Dashboard</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard icon="👩‍🎓" value={studentsRes.data?.length || 0} label="Alumnos registrados" color="green" />
         <StatCard icon="📖" value={lessonsRes.data?.length || 0} label="Lecciones activas" color="blue" />

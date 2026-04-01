@@ -18,7 +18,7 @@ export default async function LeccionesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Lecciones</h1>
+        <h1 className="text-2xl font-bold text-green-500">Lecciones</h1>
         <Link href="/lecciones/nueva"
           className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
           + Nueva Leccion

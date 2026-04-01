@@ -45,7 +45,7 @@ export default function AsistentePage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">Asistente IA</h1>
+      <h1 className="text-2xl font-bold text-green-500 mb-4">Asistente IA</h1>
 
       <div className="flex gap-2 mb-4 overflow-x-auto">
         {suggestions.map(s => (

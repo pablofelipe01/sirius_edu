@@ -23,7 +23,7 @@ export default async function AlumnoPerfilPage({ params }: { params: Promise<{ i
       <div className="flex items-center gap-4 mb-6">
         <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-2xl">👩‍🎓</div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">{student.name}</h1>
+          <h1 className="text-2xl font-bold text-green-500">{student.name}</h1>
           <p className="text-gray-500">Grado {student.grade} - Nodo {student.node_hex || '-'}</p>
         </div>
       </div>
@@ -35,7 +35,7 @@ export default async function AlumnoPerfilPage({ params }: { params: Promise<{ i
           {submissionsRes.data?.map((s: Record<string, unknown>) => (
             <div key={s.id as string} className="border-b border-gray-50 py-2 last:border-0">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">{(s.assignments as Record<string, string>)?.title || 'Tarea'}</span>
+                <span className="text-sm text-green-400">{(s.assignments as Record<string, string>)?.title || 'Tarea'}</span>
                 {s.ai_score != null && (
                   <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                     {Number(s.ai_score).toFixed(1)}/10
@@ -53,7 +53,7 @@ export default async function AlumnoPerfilPage({ params }: { params: Promise<{ i
           <h2 className="font-semibold text-gray-800 mb-3">Preguntas al profesor ({questionsRes.data?.length || 0})</h2>
           {questionsRes.data?.map((q: Record<string, unknown>) => (
             <div key={q.id as string} className="border-b border-gray-50 py-2 last:border-0">
-              <p className="text-sm text-gray-700">{q.question as string}</p>
+              <p className="text-sm text-green-400">{q.question as string}</p>
               {q.teacher_response ? (
                 <p className="text-xs text-green-600 mt-1">{q.teacher_response as string}</p>
               ) : (
@@ -69,7 +69,7 @@ export default async function AlumnoPerfilPage({ params }: { params: Promise<{ i
           <h2 className="font-semibold text-gray-800 mb-3">Conversaciones con tutor IA ({conversationsRes.data?.length || 0})</h2>
           {conversationsRes.data?.map((c: Record<string, unknown>) => (
             <div key={c.id as string} className="border-b border-gray-50 py-3 last:border-0">
-              <p className="text-sm font-medium text-gray-700">{c.question as string}</p>
+              <p className="text-sm font-medium text-green-400">{c.question as string}</p>
               <p className="text-sm text-gray-500 mt-1">{(c.ai_response as string)?.substring(0, 200)}...</p>
               <p className="text-xs text-gray-300 mt-1">{new Date(c.created_at as string).toLocaleDateString('es-CO')} - {c.ai_model as string}</p>
             </div>

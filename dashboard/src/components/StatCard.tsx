@@ -10,7 +10,7 @@ export default function StatCard({ icon, value, label, color = 'green' }: {
       <div className="flex items-center gap-3 mb-2">
         <span className={`text-2xl p-2 rounded-lg ${bg}`}>{icon}</span>
       </div>
-      <p className="text-2xl font-bold text-gray-800">{value}</p>
+      <p className="text-2xl font-bold text-green-500">{value}</p>
       <p className="text-sm text-gray-500">{label}</p>
     </div>
   )

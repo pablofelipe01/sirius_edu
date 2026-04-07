@@ -44,3 +44,48 @@ export interface StudentQuestion {
 export interface ConnectionLog {
   id: string; student_id: string; connected_at: string; node_id: number;
 }
+
+// === Structured Lessons v4 ===
+
+export interface LessonChapter {
+  id: string; lesson_id: string; chapter_number: number;
+  title: string; content: string; created_at: string;
+}
+
+export interface TestData {
+  question: string;
+  options: { label: string; text: string }[];
+  correct_answer: string;
+}
+
+export interface MissionData {
+  description: string;
+  instructions: string;
+}
+
+export interface ChapterActivity {
+  id: string; chapter_id: string; lesson_id: string;
+  activity_number: number; activity_type: 'mission' | 'test';
+  title: string; data: TestData | MissionData; created_at: string;
+}
+
+export interface StudentProgress {
+  id: string; student_id: string; lesson_id: string;
+  last_completed_chapter: number; last_completed_activity: number;
+  started_at: string; completed_at: string | null;
+}
+
+export interface StructuredLesson {
+  title: string;
+  summary: string;
+  objectives: string[];
+  chapters: {
+    title: string;
+    content: string;
+    activities: {
+      type: 'mission' | 'test';
+      title: string;
+      data: TestData | MissionData;
+    }[];
+  }[];
+}

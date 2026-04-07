@@ -17,6 +17,7 @@ class _TeacherQuestionsScreenState extends State<TeacherQuestionsScreen> {
   final _responseControllers = <String, TextEditingController>{};
   bool _syncing = false;
   StreamSubscription? _sub;
+  StreamSubscription? _syncSub;
 
   @override
   void initState() {
@@ -24,12 +25,17 @@ class _TeacherQuestionsScreenState extends State<TeacherQuestionsScreen> {
     _sub = widget.meshService.pendingQuestionStream.listen((_) {
       if (mounted) setState(() {});
     });
-    _requestQuestions();
+    _syncSub = widget.meshService.syncStatusStream.listen((status) {
+      if (status == 'SYNC_END|questions' && mounted) {
+        setState(() => _syncing = false);
+      }
+    });
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    _syncSub?.cancel();
     for (final c in _responseControllers.values) {
       c.dispose();
     }
@@ -37,11 +43,11 @@ class _TeacherQuestionsScreenState extends State<TeacherQuestionsScreen> {
   }
 
   void _requestQuestions() {
-    if (!widget.meshService.isConnected) return;
+    if (!widget.meshService.isConnected || _syncing) return;
     setState(() => _syncing = true);
     widget.meshService.requestSync('questions');
-    Future.delayed(const Duration(seconds: 10), () {
-      if (mounted) setState(() => _syncing = false);
+    Future.delayed(const Duration(seconds: 30), () {
+      if (mounted && _syncing) setState(() => _syncing = false);
     });
   }
 

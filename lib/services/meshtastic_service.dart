@@ -10,6 +10,8 @@ import '../models/chat_message.dart';
 import '../models/lesson.dart';
 import '../models/assignment.dart';
 import '../models/submission.dart';
+import '../models/lesson_chapter.dart';
+import '../models/chapter_activity.dart';
 import 'fragment_service.dart';
 import 'local_storage_service.dart';
 
@@ -35,8 +37,12 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   final bool _autoReconnectEnabled = true;
 
   Lesson? _activeLesson;
+  final List<Lesson> _lessons = [];
   List<Assignment> _assignments = [];
   final List<Submission> _submissions = [];
+
+  // Rate limiting para sync requests
+  final Map<String, DateTime> _lastSyncTime = {};
 
   Set<int> _processedPacketIds = {};
 
@@ -56,6 +62,9 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   final _assignmentController = StreamController<Assignment>.broadcast();
   final _evaluationController = StreamController<Map<String, dynamic>>.broadcast();
   final _aiResponseController = StreamController<Map<String, String>>.broadcast();
+  final _lessonStepController = StreamController<Map<String, dynamic>>.broadcast();
+  final _chapterController = StreamController<LessonChapter>.broadcast();
+  final _activityController = StreamController<ChapterActivity>.broadcast();
   final _pendingQuestionController = StreamController<Map<String, String>>.broadcast();
   final _syncStatusController = StreamController<String>.broadcast();
 
@@ -71,6 +80,7 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   int get unreadChatCount => _unreadChatCount;
   String? get errorMessage => _errorMessage;
   Lesson? get activeLesson => _activeLesson;
+  List<Lesson> get lessons => _lessons;
   List<Assignment> get assignments => _assignments;
   List<Submission> get submissions => _submissions;
   MeshtasticClient get client => _client;
@@ -82,6 +92,9 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   Stream<Assignment> get assignmentStream => _assignmentController.stream;
   Stream<Map<String, dynamic>> get evaluationStream => _evaluationController.stream;
   Stream<Map<String, String>> get aiResponseStream => _aiResponseController.stream;
+  Stream<Map<String, dynamic>> get lessonStepStream => _lessonStepController.stream;
+  Stream<LessonChapter> get chapterStream => _chapterController.stream;
+  Stream<ChapterActivity> get activityStream => _activityController.stream;
   Stream<Map<String, String>> get pendingQuestionStream => _pendingQuestionController.stream;
   Stream<String> get syncStatusStream => _syncStatusController.stream;
   List<Map<String, String>> get pendingQuestions => _pendingQuestions;
@@ -325,6 +338,20 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
       _handleAIEvaluation(text);
     } else if (text.startsWith('SYNC_RES|')) {
       _handleSyncResponse(text);
+    } else if (text.startsWith('CAPITULO|')) {
+      _handleChapter(text);
+    } else if (text.startsWith('ACTIVIDAD|')) {
+      _handleActivity(text);
+    } else if (text.startsWith('TEST_OK|')) {
+      _syncStatusController.add('TEST_OK');
+      notifyListeners();
+    } else if (text.startsWith('LECCION_PASO|')) {
+      _handleLessonStep(text);
+    } else if (text.startsWith('SYNC_END|')) {
+      _syncStatusController.add(text);
+      notifyListeners();
+    } else if (text.startsWith('ENTREGA_RES|')) {
+      _handleSubmissionResponse(text);
     } else if (text.startsWith('PREGUNTA_PROF_OK|')) {
       // Confirmación de pregunta al profesor enviada
       _syncStatusController.add(text.split('|').skip(1).join('|'));
@@ -372,16 +399,35 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   void _handleLessonMessage(String text) {
     final parts = text.split('|');
     if (parts.length < 6) return;
+    final totalChapters = parts.length > 6 ? int.tryParse(parts[6]) ?? 0 : 0;
     final lesson = Lesson(
       id: parts[1], subject: parts[2], grade: parts[3],
       title: parts[4], summary: parts[5],
-      fullContent: parts.length > 6 ? parts.sublist(6).join('|') : parts[5],
+      totalChapters: totalChapters, totalSteps: totalChapters,
       createdAt: DateTime.now(), isActive: true,
     );
+    final existingIndex = _lessons.indexWhere((l) => l.id == lesson.id);
+    if (existingIndex >= 0) {
+      _lessons[existingIndex] = lesson;
+    } else {
+      _lessons.add(lesson);
+    }
     _activeLesson = lesson;
     _storage.saveLesson(lesson);
     _lessonController.add(lesson);
     notifyListeners();
+  }
+
+  void _handleLessonStep(String text) {
+    // LECCION_PASO|lesson_id|step_num|total|content
+    final parts = text.split('|');
+    if (parts.length < 5) return;
+    _lessonStepController.add({
+      'lesson_id': parts[1],
+      'step': int.tryParse(parts[2]) ?? 0,
+      'total': int.tryParse(parts[3]) ?? 0,
+      'content': parts.sublist(4).join('|'),
+    });
   }
 
   void _handleAssignmentMessage(String text) {
@@ -391,7 +437,12 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
       id: parts[1], studentId: parts[2], description: parts[3],
       deadline: parts.length > 4 && parts[4].isNotEmpty ? DateTime.tryParse(parts[4]) : null,
     );
-    _assignments.add(assignment);
+    final existingIndex = _assignments.indexWhere((a) => a.id == assignment.id);
+    if (existingIndex >= 0) {
+      _assignments[existingIndex] = assignment;
+    } else {
+      _assignments.add(assignment);
+    }
     _storage.saveAssignment(assignment);
     _assignmentController.add(assignment);
     notifyListeners();
@@ -430,6 +481,8 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     // PREGUNTA_PEND|question_id|student_name|question_text
     final parts = text.split('|');
     if (parts.length < 4) return;
+    // Deduplicar por ID
+    if (_pendingQuestions.any((q) => q['id'] == parts[1])) return;
     final q = {
       'id': parts[1],
       'student_name': parts[2],
@@ -437,6 +490,51 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     };
     _pendingQuestions.add(q);
     _pendingQuestionController.add(q);
+    notifyListeners();
+  }
+
+  void _handleChapter(String text) {
+    // CAPITULO|lesson_id|ch_num|total|title|content
+    final parts = text.split('|');
+    if (parts.length < 6) return;
+    final chapter = LessonChapter(
+      lessonId: parts[1],
+      chapterNumber: int.tryParse(parts[2]) ?? 0,
+      totalChapters: int.tryParse(parts[3]) ?? 0,
+      title: parts[4],
+      content: parts.sublist(5).join('|'),
+    );
+    _chapterController.add(chapter);
+    notifyListeners();
+  }
+
+  void _handleActivity(String text) {
+    // ACTIVIDAD|lesson_id|ch_num|act_num|type|activity_id|data_json
+    if (!text.startsWith('ACTIVIDAD|')) return;
+    final activity = ChapterActivity.fromMeshMessage(text);
+    _activityController.add(activity);
+    notifyListeners();
+  }
+
+  void _handleSubmissionResponse(String text) {
+    // ENTREGA_RES|id|assignment_id|student_name|response|ai_score|ai_feedback
+    final parts = text.split('|');
+    if (parts.length < 7) return;
+    final submission = Submission(
+      id: parts[1],
+      assignmentId: parts[2],
+      studentId: parts[3],
+      response: parts[4],
+      submittedAt: DateTime.now(),
+      aiFeedback: parts[6],
+      aiScore: double.tryParse(parts[5]),
+    );
+    final existingIndex = _submissions.indexWhere((s) => s.id == submission.id);
+    if (existingIndex >= 0) {
+      _submissions[existingIndex] = submission;
+    } else {
+      _submissions.add(submission);
+    }
     notifyListeners();
   }
 
@@ -526,8 +624,39 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     await sendToGateway('PERFIL_UPDATE|$studentId|$field|$value');
   }
 
-  /// Solicitar sync de datos del gateway (Supabase)
+  /// Pedir un paso específico de una lección (legacy)
+  Future<void> requestLessonStep(String lessonId, int stepNum) async {
+    await sendToGateway('SYNC_REQ|lesson_step|$lessonId|$stepNum');
+  }
+
+  /// Pedir un capítulo de una lección
+  Future<void> requestChapter(String lessonId, int chapterNum) async {
+    await sendToGateway('SYNC_REQ|chapter|$lessonId|$chapterNum');
+  }
+
+  /// Pedir actividades de un capítulo
+  Future<void> requestActivities(String lessonId, int chapterNum) async {
+    await sendToGateway('SYNC_REQ|activities|$lessonId|$chapterNum');
+  }
+
+  /// Enviar respuesta de test (evaluación local)
+  Future<void> submitTestAnswer(String activityId, String studentId, String answer) async {
+    await sendToGateway('TEST_RES|$activityId|$studentId|$answer');
+  }
+
+  /// Reportar progreso
+  Future<void> reportProgress(String lessonId, int chapter, int activity) async {
+    await sendToGateway('PROGRESO|$lessonId|$chapter|$activity');
+  }
+
+  /// Solicitar sync de datos del gateway (Supabase) — rate limited 30s
   Future<void> requestSync(String tipo, [String? extra]) async {
+    final now = DateTime.now();
+    if (_lastSyncTime.containsKey(tipo) &&
+        now.difference(_lastSyncTime[tipo]!).inSeconds < 30) {
+      return;
+    }
+    _lastSyncTime[tipo] = now;
     final msg = extra != null ? 'SYNC_REQ|$tipo|$extra' : 'SYNC_REQ|$tipo';
     await sendToGateway(msg);
   }
@@ -565,6 +694,12 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> loadLocalData() async {
     _activeLesson = await _storage.getActiveLesson();
     _assignments = await _storage.getAssignments();
+    final storedLessons = await _storage.getAllLessons();
+    _lessons.clear();
+    _lessons.addAll(storedLessons);
+    if (_activeLesson == null && _lessons.isNotEmpty) {
+      _activeLesson = _lessons.first;
+    }
     notifyListeners();
   }
 
@@ -578,6 +713,9 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     _assignmentController.close();
     _evaluationController.close();
     _aiResponseController.close();
+    _lessonStepController.close();
+    _chapterController.close();
+    _activityController.close();
     _pendingQuestionController.close();
     _syncStatusController.close();
     _client.disconnect();

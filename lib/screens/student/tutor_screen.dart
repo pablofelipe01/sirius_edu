@@ -92,6 +92,25 @@ class _TutorScreenState extends State<TutorScreen> {
     });
   }
 
+  void _askTeacher() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Escribe tu pregunta primero')),
+      );
+      return;
+    }
+    widget.meshService.sendQuestionToTeacher(widget.studentName, text);
+    setState(() {
+      _messages.add(_TutorMessage(text: '(Al profesor) $text', isFromAI: false));
+    });
+    _controller.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Pregunta enviada al profesor'), backgroundColor: Color(0xFF2980B9)),
+    );
+    _scrollToBottom();
+  }
+
   int get _remainingBytes {
     final prefix = 'PREGUNTA_IA|${widget.studentName}|0|';
     final used = utf8.encode(prefix + _controller.text).length;
@@ -115,6 +134,17 @@ class _TutorScreenState extends State<TutorScreen> {
               final msg = _messages[index];
               return AIMessageBubble(text: msg.text, isFromAI: msg.isFromAI, time: msg.time);
             },
+          ),
+        ),
+
+        // Botón preguntar al profesor
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: TextButton.icon(
+            onPressed: () => _askTeacher(),
+            icon: const Icon(Icons.person, size: 16, color: Color(0xFF2980B9)),
+            label: const Text('Preguntar al profesor',
+                style: TextStyle(fontSize: 12, color: Color(0xFF2980B9))),
           ),
         ),
 

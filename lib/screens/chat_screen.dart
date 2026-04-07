@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/chat_message.dart';
 import '../services/meshtastic_service.dart';
 
-/// Pantalla de chat mesh — DM y grupo.
-/// Funciona entre alumnos, profesor, y cualquier nodo de la red.
 class ChatScreen extends StatefulWidget {
   final MeshtasticService meshService;
   final String userName;
@@ -18,50 +16,28 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  int? _selectedDM; // null = grupo, int = DM a ese nodeId
-  StreamSubscription<ChatMessage>? _sub;
+  StreamSubscription? _messageSub;
+  int? _selectedDM;
+  String? _selectedDMName;
 
   @override
   void initState() {
     super.initState();
-    _sub = widget.meshService.messageStream.listen((_) {
+    _messageSub = widget.meshService.messageStream.listen((_) {
       if (mounted) {
         setState(() {});
         _scrollToBottom();
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
+    _messageSub?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  List<ChatMessage> get _filteredMessages {
-    final all = widget.meshService.messageHistory;
-    if (_selectedDM == null) {
-      return all.where((m) => !m.isDirectMessage).toList();
-    }
-    return all.where((m) =>
-      m.isDirectMessage &&
-      (m.fromNodeId == _selectedDM || m.toNodeId == _selectedDM)
-    ).toList();
-  }
-
-  void _send() {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-
-    widget.meshService.sendChatMessage(
-      text,
-      destinationId: _selectedDM,
-      channel: _selectedDM == null ? 0 : 0,
-    );
-    _controller.clear();
-    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -69,71 +45,126 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
+  void _sendMessage() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    widget.meshService.sendChatMessage(text, destinationId: _selectedDM);
+    _controller.clear();
+    _scrollToBottom();
+  }
+
+  List<ChatMessage> get _filteredMessages {
+    return widget.meshService.messageHistory.where((m) {
+      // Filtrar mensajes de protocolo
+      if (m.messageText.startsWith('ROSTER_') ||
+          m.messageText.startsWith('SYNC_') ||
+          m.messageText.startsWith('LECCION') ||
+          m.messageText.startsWith('TAREA|') ||
+          m.messageText.startsWith('EVAL_IA|') ||
+          m.messageText.startsWith('RESPUESTA_IA|') ||
+          m.messageText.startsWith('PREGUNTA_') ||
+          m.messageText.startsWith('RESP_PROF') ||
+          m.messageText.startsWith('ENTREGA') ||
+          m.messageText.startsWith('LECCION_PASO|')) {
+        return false;
+      }
+      if (_selectedDM != null) {
+        return (m.fromNodeId == _selectedDM && m.isDirectMessage) ||
+            (m.isMine && m.toNodeId == _selectedDM);
+      }
+      return !m.isDirectMessage || m.isMine;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final nodes = widget.meshService.knownNodes
-        .where((n) => n.nodeId != (widget.meshService.client.myNodeInfo?.myNodeNum ?? 0))
-        .toList();
+    widget.meshService.markChatAsRead();
     final messages = _filteredMessages;
+    final myNodeNum = widget.meshService.client.myNodeInfo?.myNodeNum;
+    final otherNodes = widget.meshService.knownNodes
+        .where((n) => n.nodeId != myNodeNum && n.nodeId != widget.meshService.gatewayNodeId)
+        .toList();
 
     return Column(
       children: [
-        // Selector: Grupo / DM
+        // Channel/DM selector
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-          ),
-          child: SingleChildScrollView(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: ListView(
             scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _ChannelChip(
-                  label: 'Grupo',
-                  icon: Icons.group,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: ChoiceChip(
+                  label: const Text('Grupo'),
                   selected: _selectedDM == null,
-                  onTap: () => setState(() => _selectedDM = null),
+                  onSelected: (_) => setState(() {
+                    _selectedDM = null;
+                    _selectedDMName = null;
+                  }),
+                  selectedColor: const Color(0xFF27AE60).withValues(alpha: 0.2),
                 ),
-                ...nodes.map((node) => _ChannelChip(
-                  label: node.displayName,
-                  icon: Icons.person,
+              ),
+              ...otherNodes.map((node) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: ChoiceChip(
+                  label: Text(node.displayName),
                   selected: _selectedDM == node.nodeId,
-                  onTap: () => setState(() => _selectedDM = node.nodeId),
-                )),
-              ],
-            ),
+                  onSelected: (_) => setState(() {
+                    _selectedDM = node.nodeId;
+                    _selectedDMName = node.displayName;
+                  }),
+                  selectedColor: const Color(0xFF2980B9).withValues(alpha: 0.2),
+                  avatar: Icon(Icons.circle, size: 8,
+                      color: node.isOnline ? const Color(0xFF27AE60) : Colors.grey.shade400),
+                ),
+              )),
+            ],
           ),
         ),
 
-        // Mensajes
+        const Divider(height: 1),
+
+        // Messages
         Expanded(
           child: messages.isEmpty
               ? Center(
                   child: Text(
-                    _selectedDM == null ? 'No hay mensajes en el grupo' : 'No hay mensajes',
+                    _selectedDM != null
+                        ? 'No hay mensajes con $_selectedDMName'
+                        : 'No hay mensajes en el grupo',
                     style: const TextStyle(color: Color(0xFF95A5A6)),
                   ),
                 )
               : ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
-                    return _ChatBubble(message: msg);
+                    final showDate = index == 0 ||
+                        !msg.isSameDay(messages[index - 1]);
+
+                    return Column(
+                      children: [
+                        if (showDate)
+                          _DateSeparator(date: msg.formattedDate),
+                        _MessageBubble(message: msg),
+                      ],
+                    );
                   },
                 ),
         ),
 
-        // Input
+        // Input bar
         Container(
           padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
           decoration: BoxDecoration(
@@ -148,18 +179,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: _selectedDM == null ? 'Mensaje al grupo...' : 'Mensaje directo...',
+                      hintText: _selectedDM != null
+                          ? 'Mensaje a $_selectedDMName...'
+                          : 'Mensaje al grupo...',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      filled: true,
+                      fillColor: const Color(0xFFF8F9FA),
                     ),
                     maxLines: 3,
                     minLines: 1,
-                    onSubmitted: (_) => _send(),
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 FloatingActionButton.small(
-                  onPressed: _send,
+                  onPressed: _sendMessage,
                   backgroundColor: const Color(0xFF27AE60),
                   child: const Icon(Icons.send, color: Colors.white, size: 20),
                 ),
@@ -172,70 +208,95 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-class _ChannelChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ChannelChip({required this.label, required this.icon, required this.selected, required this.onTap});
+class _DateSeparator extends StatelessWidget {
+  final String date;
+  const _DateSeparator({required this.date});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: FilterChip(
-        selected: selected,
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: selected ? Colors.white : const Color(0xFF7F8C8D)),
-            const SizedBox(width: 4),
-            Text(label, style: TextStyle(fontSize: 12, color: selected ? Colors.white : const Color(0xFF2C3E50))),
-          ],
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFECF0F1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(date, style: const TextStyle(fontSize: 11, color: Color(0xFF7F8C8D))),
         ),
-        onSelected: (_) => onTap(),
-        selectedColor: const Color(0xFF27AE60),
-        backgroundColor: Colors.grey.shade100,
-        showCheckmark: false,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
       ),
     );
   }
 }
 
-class _ChatBubble extends StatelessWidget {
+class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
-  const _ChatBubble({required this.message});
+  const _MessageBubble({required this.message});
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: message.isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-        margin: const EdgeInsets.symmetric(vertical: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: message.isMine ? const Color(0xFFE8F8E8) : const Color(0xFFF0F0F0),
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(14),
-            topRight: const Radius.circular(14),
-            bottomLeft: Radius.circular(message.isMine ? 14 : 4),
-            bottomRight: Radius.circular(message.isMine ? 4 : 14),
+    final isMine = message.isMine;
+    final bgColor = isMine ? const Color(0xFFDCF8C6) : Colors.white;
+    final alignment = isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Column(
+        crossAxisAlignment: alignment,
+        children: [
+          Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.78,
+            ),
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(12),
+                topRight: const Radius.circular(12),
+                bottomLeft: Radius.circular(isMine ? 12 : 2),
+                bottomRight: Radius.circular(isMine ? 2 : 12),
+              ),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 2, offset: const Offset(0, 1)),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!isMine)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(message.fromNodeName,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2980B9))),
+                  ),
+                Text(message.messageText,
+                    style: const TextStyle(fontSize: 15, color: Color(0xFF2C3E50))),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(message.formattedTime,
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF95A5A6))),
+                    if (isMine) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        message.deliveryStatus == DeliveryStatus.sending
+                            ? Icons.access_time
+                            : Icons.check,
+                        size: 13,
+                        color: message.deliveryStatus == DeliveryStatus.sending
+                            ? const Color(0xFF95A5A6)
+                            : const Color(0xFF27AE60),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!message.isMine)
-              Text(message.fromNodeName,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2980B9))),
-            Text(message.messageText, style: const TextStyle(fontSize: 14, color: Color(0xFF2C3E50))),
-            Text(message.formattedTime,
-                style: const TextStyle(fontSize: 10, color: Color(0xFF95A5A6))),
-          ],
-        ),
+        ],
       ),
     );
   }

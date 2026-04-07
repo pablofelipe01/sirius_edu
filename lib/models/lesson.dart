@@ -5,6 +5,8 @@ class Lesson {
   final String title;
   final String summary;
   final String fullContent;
+  final int totalSteps; // legacy, use totalChapters
+  final int totalChapters;
   final DateTime createdAt;
   final bool isActive;
   final List<String> assignmentIds;
@@ -15,7 +17,9 @@ class Lesson {
     required this.grade,
     required this.title,
     required this.summary,
-    required this.fullContent,
+    this.fullContent = '',
+    this.totalSteps = 0,
+    this.totalChapters = 0,
     required this.createdAt,
     this.isActive = true,
     this.assignmentIds = const [],
@@ -28,6 +32,8 @@ class Lesson {
     'title': title,
     'summary': summary,
     'full_content': fullContent,
+    'total_steps': totalSteps,
+    'total_chapters': totalChapters,
     'created_at': createdAt.toIso8601String(),
     'is_active': isActive,
     'assignment_ids': assignmentIds,
@@ -40,6 +46,8 @@ class Lesson {
     title: json['title'] as String,
     summary: json['summary'] as String,
     fullContent: json['full_content'] as String? ?? '',
+    totalSteps: json['total_steps'] as int? ?? 0,
+    totalChapters: json['total_chapters'] as int? ?? 0,
     createdAt: DateTime.parse(json['created_at'] as String),
     isActive: json['is_active'] as bool? ?? true,
     assignmentIds: (json['assignment_ids'] as List?)?.cast<String>() ?? [],

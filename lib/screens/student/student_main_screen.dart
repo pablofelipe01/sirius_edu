@@ -4,9 +4,6 @@ import '../settings_screen.dart';
 import '../device_selection_screen.dart';
 import '../chat_screen.dart';
 import 'lesson_screen.dart';
-import 'tutor_screen.dart';
-import 'assignments_screen.dart';
-import 'progress_screen.dart';
 
 class StudentMainScreen extends StatefulWidget {
   final MeshtasticService meshService;
@@ -26,11 +23,8 @@ class _StudentMainScreenState extends State<StudentMainScreen> {
   void initState() {
     super.initState();
     _screens = [
-      LessonScreen(meshService: widget.meshService),
-      TutorScreen(meshService: widget.meshService, studentName: widget.studentName),
-      AssignmentsScreen(meshService: widget.meshService, studentName: widget.studentName),
+      LessonScreen(meshService: widget.meshService, studentName: widget.studentName),
       ChatScreen(meshService: widget.meshService, userName: widget.studentName),
-      ProgressScreen(meshService: widget.meshService, studentName: widget.studentName),
       SettingsScreen(
         meshService: widget.meshService,
         onDeviceChange: _goToDeviceSelection,
@@ -78,8 +72,6 @@ class _StudentMainScreenState extends State<StudentMainScreen> {
           onDestinationSelected: (i) => setState(() => _currentIndex = i),
           destinations: [
             const NavigationDestination(icon: Icon(Icons.menu_book), label: 'Lecciones'),
-            const NavigationDestination(icon: Icon(Icons.smart_toy), label: 'Tutor IA'),
-            const NavigationDestination(icon: Icon(Icons.assignment), label: 'Tareas'),
             NavigationDestination(
               icon: Badge(
                 label: Text('${widget.meshService.unreadChatCount}'),
@@ -88,7 +80,6 @@ class _StudentMainScreenState extends State<StudentMainScreen> {
               ),
               label: 'Chat',
             ),
-            const NavigationDestination(icon: Icon(Icons.emoji_events), label: 'Progreso'),
             const NavigationDestination(icon: Icon(Icons.settings), label: 'Ajustes'),
           ],
         ),

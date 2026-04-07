@@ -3,7 +3,7 @@ import '../../services/meshtastic_service.dart';
 import '../settings_screen.dart';
 import '../device_selection_screen.dart';
 import '../chat_screen.dart';
-import 'students_screen.dart';
+import 'submissions_screen.dart';
 import 'teacher_questions_screen.dart';
 import 'teacher_ai_screen.dart';
 
@@ -25,7 +25,7 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
   void initState() {
     super.initState();
     _screens = [
-      StudentsScreen(meshService: widget.meshService),
+      SubmissionsScreen(meshService: widget.meshService),
       TeacherQuestionsScreen(meshService: widget.meshService, teacherName: widget.teacherName),
       ChatScreen(meshService: widget.meshService, userName: widget.teacherName),
       TeacherAIScreen(meshService: widget.meshService, teacherName: widget.teacherName),
@@ -75,7 +75,14 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
           selectedIndex: _currentIndex,
           onDestinationSelected: (i) => setState(() => _currentIndex = i),
           destinations: [
-            const NavigationDestination(icon: Icon(Icons.people), label: 'Alumnos'),
+            NavigationDestination(
+              icon: Badge(
+                label: Text('${widget.meshService.submissions.length}'),
+                isLabelVisible: widget.meshService.submissions.isNotEmpty,
+                child: const Icon(Icons.grading),
+              ),
+              label: 'Entregas',
+            ),
             NavigationDestination(
               icon: Badge(
                 label: Text('${widget.meshService.pendingQuestions.length}'),
@@ -92,7 +99,7 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
               ),
               label: 'Chat',
             ),
-            const NavigationDestination(icon: Icon(Icons.smart_toy), label: 'Asistente IA'),
+            const NavigationDestination(icon: Icon(Icons.smart_toy), label: 'IA'),
             const NavigationDestination(icon: Icon(Icons.settings), label: 'Ajustes'),
           ],
         ),

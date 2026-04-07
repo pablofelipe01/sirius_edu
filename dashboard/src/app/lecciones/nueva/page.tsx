@@ -267,6 +267,14 @@ function WizardMode({ onBack }: { onBack: () => void }) {
             </div>
           )}
         </div>
+        {lessonData && (
+          <div className="mb-2">
+            <button type="button" onClick={() => setStep('review')}
+              className="w-full bg-green-600 text-white py-3 rounded-xl font-medium hover:bg-green-700 animate-pulse">
+              Leccion lista — Revisar y guardar
+            </button>
+          </div>
+        )}
         <div className="flex gap-2">
           <input id="wz-chat-input" value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendMessage()}

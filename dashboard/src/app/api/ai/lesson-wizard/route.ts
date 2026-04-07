@@ -137,23 +137,68 @@ export async function POST(req: NextRequest) {
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
 
-  // Detect structured lesson JSON
+  // Detect structured lesson JSON — multiple strategies
   let lessonData = null
-  const jsonMatch = text.match(/LECCION_JSON:\s*(\{[\s\S]*\})/m)
-  if (jsonMatch) {
-    try {
-      lessonData = JSON.parse(jsonMatch[1])
-    } catch {
-      const start = text.lastIndexOf('{')
-      const end = text.lastIndexOf('}') + 1
-      if (start >= 0 && end > start) {
-        try { lessonData = JSON.parse(text.substring(start, end)) } catch { /* ignore */ }
-      }
+  let jsonText = ''
+
+  // Strategy 1: LECCION_JSON: prefix
+  const prefixMatch = text.match(/LECCION_JSON:\s*(\{[\s\S]*\})/m)
+  if (prefixMatch) {
+    jsonText = prefixMatch[1]
+  }
+
+  // Strategy 2: JSON in code block ```json ... ```
+  if (!jsonText) {
+    const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/m)
+    if (codeBlockMatch) {
+      jsonText = codeBlockMatch[1]
     }
   }
 
+  // Strategy 3: Find JSON with "chapters" key
+  if (!jsonText) {
+    const start = text.indexOf('{"title"')
+    if (start === -1) {
+      const altStart = text.indexOf('{\n')
+      if (altStart >= 0) {
+        const end = text.lastIndexOf('}') + 1
+        if (end > altStart) jsonText = text.substring(altStart, end)
+      }
+    } else {
+      const end = text.lastIndexOf('}') + 1
+      if (end > start) jsonText = text.substring(start, end)
+    }
+  }
+
+  // Try to parse
+  if (jsonText) {
+    try {
+      const parsed = JSON.parse(jsonText)
+      if (parsed.title && (parsed.chapters || parsed.content)) {
+        lessonData = parsed
+      }
+    } catch {
+      // Try cleaning common issues
+      try {
+        const cleaned = jsonText.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
+        const parsed = JSON.parse(cleaned)
+        if (parsed.title) lessonData = parsed
+      } catch { /* ignore */ }
+    }
+  }
+
+  // Clean the response text (remove the JSON part)
+  let cleanResponse = text
+  if (lessonData) {
+    cleanResponse = text
+      .replace(/LECCION_JSON:\s*\{[\s\S]*\}/m, '')
+      .replace(/```(?:json)?\s*\{[\s\S]*?\}\s*```/m, '')
+      .trim()
+    if (!cleanResponse) cleanResponse = 'Leccion generada. Revisa y edita antes de guardar.'
+  }
+
   return NextResponse.json({
-    response: text.replace(/LECCION_JSON:\s*\{[\s\S]*\}/m, '').trim(),
+    response: cleanResponse,
     lessonData,
   })
 }

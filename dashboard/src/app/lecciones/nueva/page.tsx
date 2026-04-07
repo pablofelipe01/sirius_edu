@@ -164,6 +164,7 @@ function WizardMode({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<'select' | 'chat' | 'review'>('select')
   const [subject, setSubject] = useState('ciencias_naturales')
   const [grade, setGrade] = useState('2')
+  const [period, setPeriod] = useState('1')
   const [weekNumber, setWeekNumber] = useState(1)
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [input, setInput] = useState('')
@@ -173,13 +174,13 @@ function WizardMode({ onBack }: { onBack: () => void }) {
   const subjectName = subjects.find(s => s.code === subject)?.name || subject
 
   async function startWizard() {
-    const firstMessage = `Quiero crear una leccion de ${subjectName} para grado ${grade}. Sugiereme 5 temas apropiados.`
+    const firstMessage = `Quiero crear una leccion de ${subjectName} para grado ${grade}, periodo ${period}. Sugiereme 5 temas apropiados del curriculo oficial para este periodo.`
     setMessages([{ role: 'user', content: firstMessage }])
     setStep('chat')
     setLoading(true)
     const res = await fetch('/api/ai/lesson-wizard', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role: 'user', content: firstMessage }] }),
+      body: JSON.stringify({ messages: [{ role: 'user', content: firstMessage }], grade, subject_code: subject, period }),
     })
     const data = await res.json()
     setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
@@ -196,7 +197,7 @@ function WizardMode({ onBack }: { onBack: () => void }) {
     setLoading(true)
     const res = await fetch('/api/ai/lesson-wizard', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: newMessages }),
+      body: JSON.stringify({ messages: newMessages, grade, subject_code: subject, period }),
     })
     const data = await res.json()
     setMessages(prev => [...prev, { role: 'assistant' as const, content: data.response }])
@@ -209,18 +210,24 @@ function WizardMode({ onBack }: { onBack: () => void }) {
       <div className="max-w-md">
         <button type="button" onClick={onBack} className="text-sm text-gray-400 hover:text-gray-600 mb-4">&larr; Volver</button>
         <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-4">
-          <p className="text-green-600 font-medium">Selecciona materia y grado:</p>
+          <p className="text-green-600 font-medium">Selecciona materia, grado y periodo:</p>
           <Field id="wz-subject" label="Materia">
             {(id) => <select id={id} value={subject} onChange={e => setSubject(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm">
               {subjects.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
             </select>}
           </Field>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <Field id="wz-grade" label="Grado">
               {(id) => <select id={id} value={grade} onChange={e => setGrade(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 text-sm">
                 {[1,2,3,4,5].map(g => <option key={g} value={String(g)}>{g} Grado</option>)}
+              </select>}
+            </Field>
+            <Field id="wz-period" label="Periodo">
+              {(id) => <select id={id} value={period} onChange={e => setPeriod(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm">
+                {[1,2,3,4].map(p => <option key={p} value={String(p)}>Periodo {p}</option>)}
               </select>}
             </Field>
             <Field id="wz-week" label="Semana">

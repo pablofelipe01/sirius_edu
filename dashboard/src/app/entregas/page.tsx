@@ -11,13 +11,13 @@ interface SubmissionRow {
   ai_feedback: string | null
   ai_score: number | null
   roster: { name: string; grade: string } | null
-  chapter_activities: { title: string; lesson_id: string } | null
+  chapter_activities: { title: string; lessons: { title: string } | null } | null
 }
 
 export default async function EntregasPage() {
   const { data: submissions } = await supabase
     .from('submissions')
-    .select('*, roster!submissions_student_id_fkey(name, grade), chapter_activities(title, lesson_id)')
+    .select('*, roster!submissions_student_id_fkey(name, grade), chapter_activities(title, lessons(title))')
     .order('submitted_at', { ascending: false })
     .limit(50)
 
@@ -42,8 +42,10 @@ export default async function EntregasPage() {
                       {s.roster?.name || 'Alumno'} <span className="text-xs text-gray-400">- Grado {s.roster?.grade || '?'}</span>
                     </h3>
                     <p className="text-xs text-gray-400">
-                      {s.chapter_activities?.title || 'Actividad'} - {new Date(s.submitted_at).toLocaleString('es-CO')}
+                      {s.chapter_activities?.title || 'Actividad'}
+                      {s.chapter_activities?.lessons?.title && ` - ${s.chapter_activities.lessons.title}`}
                     </p>
+                    <p className="text-xs text-gray-300">{new Date(s.submitted_at).toLocaleString('es-CO')}</p>
                   </div>
                   {s.ai_score !== null && (
                     <span className={`text-sm px-3 py-1 rounded-full font-bold ${
@@ -87,8 +89,10 @@ export default async function EntregasPage() {
                     {s.roster?.name || 'Alumno'} <span className="text-xs text-gray-400">- Grado {s.roster?.grade || '?'}</span>
                   </h3>
                   <p className="text-xs text-gray-400">
-                    {s.chapter_activities?.title || 'Test'} - {new Date(s.submitted_at).toLocaleString('es-CO')}
+                    {s.chapter_activities?.title || 'Test'}
+                    {s.chapter_activities?.lessons?.title && ` - ${s.chapter_activities.lessons.title}`}
                   </p>
+                  <p className="text-xs text-gray-300">{new Date(s.submitted_at).toLocaleString('es-CO')}</p>
                 </div>
                 <span className="text-sm font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-full">
                   Respuesta: {s.response}

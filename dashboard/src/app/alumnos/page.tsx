@@ -1,11 +1,13 @@
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import type { RosterUser } from '@/lib/types'
+import { getSession } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AlumnosPage() {
-  const schoolId = process.env.SCHOOL_ID || 'a0000000-0000-0000-0000-000000000001'
+  const session = await getSession()
+  const schoolId = session!.school_id
 
   const { data: students } = await supabase
     .from('roster')

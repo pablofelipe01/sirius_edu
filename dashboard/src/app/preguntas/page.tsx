@@ -7,15 +7,27 @@ export default function PreguntasPage() {
   const [questions, setQuestions] = useState<StudentQuestion[]>([])
   const [response, setResponse] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<string | null>(null)
+  const [schoolId, setSchoolId] = useState<string | null>(null)
 
   useEffect(() => {
-    loadQuestions()
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(s => {
+        if (s.school_id) {
+          setSchoolId(s.school_id)
+        }
+      })
   }, [])
 
-  async function loadQuestions() {
+  useEffect(() => {
+    if (schoolId) loadQuestions(schoolId)
+  }, [schoolId])
+
+  async function loadQuestions(sid: string) {
     const { data } = await supabase
       .from('student_questions')
       .select('*, roster!student_questions_student_id_fkey(name, grade)')
+      .eq('school_id', sid)
       .order('created_at', { ascending: false })
       .limit(50)
     setQuestions((data || []) as StudentQuestion[])
@@ -34,7 +46,7 @@ export default function PreguntasPage() {
 
     setSaving(null)
     setResponse(r => ({ ...r, [questionId]: '' }))
-    loadQuestions()
+    if (schoolId) loadQuestions(schoolId)
   }
 
   const pending = questions.filter(q => !q.teacher_response)

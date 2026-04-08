@@ -2,11 +2,13 @@ import { supabase } from '@/lib/supabase'
 import LessonCard from '@/components/LessonCard'
 import Link from 'next/link'
 import type { Lesson } from '@/lib/types'
+import { getSession } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
 
 export default async function LeccionesPage() {
-  const schoolId = process.env.SCHOOL_ID || 'a0000000-0000-0000-0000-000000000001'
+  const session = await getSession()
+  const schoolId = session!.school_id
 
   const { data: lessons } = await supabase
     .from('lessons')

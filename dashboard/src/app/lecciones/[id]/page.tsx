@@ -1,187 +1,123 @@
-'use client'
-import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter, useParams } from 'next/navigation'
-import type { Lesson, Assignment } from '@/lib/types'
+import { getSession } from '@/lib/session'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
-const subjects = [
-  { code: 'ciencias_naturales', name: 'Ciencias Naturales' },
-  { code: 'matematicas', name: 'Matematicas' },
-  { code: 'lenguaje', name: 'Lenguaje' },
-  { code: 'ciencias_sociales', name: 'Ciencias Sociales' },
-]
+export const dynamic = 'force-dynamic'
 
-export default function EditLessonPage() {
-  const router = useRouter()
-  const params = useParams()
-  const id = params.id as string
+interface Chapter {
+  id: string
+  chapter_number: number
+  title: string
+  content: string
+}
 
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [lesson, setLesson] = useState<Lesson | null>(null)
-  const [assignments, setAssignments] = useState<Assignment[]>([])
+interface Activity {
+  id: string
+  chapter_id: string
+  activity_number: number
+  activity_type: 'mission' | 'test'
+  title: string
+  data: Record<string, unknown>
+}
 
-  const [form, setForm] = useState({
-    subject_code: '', grade: '', week_number: 0,
-    title: '', summary: '', content: '', objectives: '',
-    is_active: true,
-  })
+export default async function LessonDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const session = await getSession()
+  const schoolId = session!.school_id
 
-  useEffect(() => {
-    loadLesson()
-  }, [id])
+  const { data: lesson } = await supabase
+    .from('lessons')
+    .select('*')
+    .eq('id', id)
+    .single()
 
-  async function loadLesson() {
-    const { data: lessonData } = await supabase.from('lessons').select('*').eq('id', id).single()
-    const { data: assignmentData } = await supabase.from('assignments').select('*').eq('lesson_id', id)
-
-    if (lessonData) {
-      setLesson(lessonData as Lesson)
-      setForm({
-        subject_code: lessonData.subject_code || '',
-        grade: lessonData.grade || '',
-        week_number: lessonData.week_number || 0,
-        title: lessonData.title || '',
-        summary: lessonData.summary || '',
-        content: lessonData.content || '',
-        objectives: (lessonData.objectives || []).join('\n'),
-        is_active: lessonData.is_active ?? true,
-      })
-    }
-    if (assignmentData) setAssignments(assignmentData as Assignment[])
-    setLoading(false)
-  }
-
-  const update = (field: string, value: string | number | boolean) => setForm(f => ({ ...f, [field]: value }))
-
-  async function save() {
-    if (!form.title || !form.content) return alert('Completa titulo y contenido')
-    setSaving(true)
-
-    const { error } = await supabase.from('lessons').update({
-      subject_code: form.subject_code,
-      grade: form.grade,
-      week_number: form.week_number,
-      title: form.title,
-      summary: form.summary || form.content.substring(0, 200),
-      content: form.content,
-      objectives: form.objectives.split('\n').filter(Boolean),
-      is_active: form.is_active,
-      updated_at: new Date().toISOString(),
-    }).eq('id', id)
-
-    setSaving(false)
-    if (error) {
-      alert('Error: ' + error.message)
-    } else {
-      router.push('/lecciones')
-    }
-  }
-
-  async function deleteLesson() {
-    const confirm = window.confirm('Eliminar esta leccion y sus tareas?')
-    if (!confirm) return
-
-    await supabase.from('assignments').delete().eq('lesson_id', id)
-    await supabase.from('lessons').delete().eq('id', id)
-    router.push('/lecciones')
-  }
-
-  if (loading) return <p className="text-gray-400">Cargando...</p>
   if (!lesson) return <p className="text-gray-400">Leccion no encontrada</p>
+  if (lesson.school_id !== schoolId) redirect('/lecciones')
+
+  const { data: chapters } = await supabase
+    .from('lesson_chapters')
+    .select('*')
+    .eq('lesson_id', id)
+    .order('chapter_number')
+
+  const { data: activities } = await supabase
+    .from('chapter_activities')
+    .select('*')
+    .eq('lesson_id', id)
+    .order('activity_number')
+
+  const chs = (chapters as Chapter[] | null) || []
+  const acts = (activities as Activity[] | null) || []
 
   return (
-    <div className="max-w-2xl">
-      <button onClick={() => router.push('/lecciones')} className="text-sm text-gray-400 hover:text-gray-600 mb-4">
-        &larr; Volver a lecciones
-      </button>
+    <div className="max-w-3xl">
+      <Link href="/lecciones" className="text-sm text-gray-400 hover:text-gray-600 mb-4 inline-block">&larr; Volver</Link>
 
-      <h1 className="text-2xl font-bold text-green-500 mb-6">Editar Leccion</h1>
-
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <div className="bg-white rounded-xl border border-green-200 p-5 mb-6">
+        <div className="flex items-start justify-between mb-2">
           <div>
-            <label className="block text-sm font-medium text-green-400 mb-1">Materia</label>
-            <select value={form.subject_code} onChange={e => update('subject_code', e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm">
-              {subjects.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
-            </select>
+            <h1 className="text-2xl font-bold text-green-600">{lesson.title}</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {lesson.subject_code} - Grado {lesson.grade} - Semana {lesson.week_number}
+            </p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-green-400 mb-1">Grado</label>
-            <select value={form.grade} onChange={e => update('grade', e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm">
-              {[1,2,3,4,5].map(g => <option key={g} value={String(g)}>{g} Grado</option>)}
-            </select>
-          </div>
+          <span className={`text-xs px-2 py-1 rounded-full ${lesson.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            {lesson.is_active ? 'Activa' : 'Inactiva'}
+          </span>
         </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-green-400 mb-1">Semana</label>
-            <input type="number" value={form.week_number} onChange={e => update('week_number', Number(e.target.value))}
-              className="w-full border rounded-lg px-3 py-2 text-sm" min={1} max={52} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-green-400 mb-1">Estado</label>
-            <select value={form.is_active ? 'true' : 'false'}
-              onChange={e => update('is_active', e.target.value === 'true')}
-              className="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="true">Activa</option>
-              <option value="false">Inactiva</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-green-400 mb-1">Titulo</label>
-          <input value={form.title} onChange={e => update('title', e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-green-400 mb-1">Resumen</label>
-          <textarea value={form.summary} onChange={e => update('summary', e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} maxLength={200} />
-          <p className="text-xs text-gray-400 text-right">{form.summary.length}/200</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-green-400 mb-1">Contenido</label>
-          <textarea value={form.content} onChange={e => update('content', e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" rows={12} />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-green-400 mb-1">Objetivos (uno por linea)</label>
-          <textarea value={form.objectives} onChange={e => update('objectives', e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm" rows={3} />
-        </div>
-
-        {/* Tareas vinculadas */}
-        {assignments.length > 0 && (
-          <div className="border-t border-gray-200 pt-4">
-            <h2 className="text-lg font-semibold text-green-500 mb-3">Tareas vinculadas</h2>
-            {assignments.map(a => (
-              <div key={a.id} className="bg-gray-50 rounded-lg p-3 mb-2">
-                <p className="font-medium text-sm text-gray-800">{a.title}</p>
-                <p className="text-xs text-gray-500">{a.description}</p>
-              </div>
-            ))}
+        {lesson.summary && <p className="text-gray-600 mt-2">{lesson.summary}</p>}
+        {lesson.objectives?.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase">Objetivos</p>
+            <ul className="text-sm text-gray-600 mt-1 list-disc list-inside">
+              {lesson.objectives.map((o: string, i: number) => <li key={i}>{o}</li>)}
+            </ul>
           </div>
         )}
-
-        <div className="flex gap-3">
-          <button type="button" onClick={save} disabled={saving}
-            className="flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
-            {saving ? 'Guardando...' : 'Guardar cambios'}
-          </button>
-          <button type="button" onClick={deleteLesson}
-            className="px-6 py-3 rounded-lg font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-colors">
-            Eliminar
-          </button>
-        </div>
       </div>
+
+      <h2 className="text-lg font-semibold text-gray-700 mb-3">Capitulos ({chs.length})</h2>
+      {chs.map(ch => {
+        const chapterActs = acts.filter(a => a.chapter_id === ch.id)
+        return (
+          <div key={ch.id} className="bg-white rounded-xl border border-blue-100 p-5 mb-4">
+            <h3 className="font-semibold text-blue-600 mb-2">
+              Capitulo {ch.chapter_number}: {ch.title}
+            </h3>
+            <p className="text-sm text-gray-600 whitespace-pre-wrap mb-3">{ch.content}</p>
+
+            {chapterActs.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase">Actividades</p>
+                {chapterActs.map(a => (
+                  <div key={a.id} className={`rounded-lg p-3 ${a.activity_type === 'test' ? 'bg-purple-50' : 'bg-orange-50'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${a.activity_type === 'test' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
+                        {a.activity_type === 'test' ? 'Test' : 'Mision'}
+                      </span>
+                      <span className="text-sm font-medium text-gray-700">{a.title}</span>
+                    </div>
+                    {a.activity_type === 'test' && (
+                      <div className="text-xs text-gray-600 mt-1">
+                        <p className="font-medium">{(a.data.question || a.data.q) as string}</p>
+                        <p className="text-gray-400 mt-1">Respuesta correcta: {(a.data.correct_answer || a.data.r) as string}</p>
+                      </div>
+                    )}
+                    {a.activity_type === 'mission' && (
+                      <p className="text-xs text-gray-600 mt-1">{(a.data.description || a.data.d) as string}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {chs.length === 0 && (
+        <p className="text-sm text-gray-400">Esta leccion no tiene capitulos estructurados.</p>
+      )}
     </div>
   )
 }

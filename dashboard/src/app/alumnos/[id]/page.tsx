@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import { getSession } from '@/lib/session'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +36,8 @@ interface ConversationRow {
 
 export default async function AlumnoPerfilPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const session = await getSession()
+  const schoolId = session!.school_id
 
   const [studentRes, conversationsRes, questionsRes, submissionsRes] = await Promise.all([
     supabase.from('roster').select('*').eq('id', id).single(),
@@ -49,6 +53,8 @@ export default async function AlumnoPerfilPage({ params }: { params: Promise<{ i
 
   const student = studentRes.data
   if (!student) return <p className="text-gray-400">Alumno no encontrado</p>
+  // Prevent cross-school access
+  if (student.school_id !== schoolId) redirect('/alumnos')
 
   const submissions = (submissionsRes.data as SubmissionRow[] | null) || []
   const missions = submissions.filter(s => s.activity_type === 'mission')

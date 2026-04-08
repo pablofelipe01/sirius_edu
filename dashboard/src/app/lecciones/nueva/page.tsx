@@ -421,7 +421,12 @@ function LessonReviewEditor({
     if (!lessonData.title) { alert('Falta el titulo'); return }
     if (lessonData.chapters.length === 0) { alert('Agrega al menos un capitulo'); return }
     setSaving(true)
-    const schoolId = process.env.NEXT_PUBLIC_SCHOOL_ID || 'a0000000-0000-0000-0000-000000000001'
+
+    // Get school_id from session
+    const meRes = await fetch('/api/auth/me')
+    if (!meRes.ok) { setSaving(false); alert('Sesion expirada, vuelve a iniciar sesion'); return }
+    const me = await meRes.json()
+    const schoolId = me.school_id
 
     // 1. Create lesson
     const content = lessonData.chapters.map(c => c.content).join('\n\n')

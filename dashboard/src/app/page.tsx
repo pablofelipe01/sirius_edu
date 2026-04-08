@@ -1,10 +1,12 @@
 import { supabase } from '@/lib/supabase'
 import StatCard from '@/components/StatCard'
+import { getSession } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
-  const schoolId = process.env.SCHOOL_ID || 'a0000000-0000-0000-0000-000000000001'
+  const session = await getSession()
+  const schoolId = session!.school_id
 
   const [studentsRes, lessonsRes, questionsRes, submissionsRes] = await Promise.all([
     supabase.from('roster').select('id').eq('school_id', schoolId).eq('role', 'student').eq('is_active', true),

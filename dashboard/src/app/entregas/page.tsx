@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getSession } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,9 +28,13 @@ interface LessonGroup {
 }
 
 export default async function EntregasPage() {
+  const session = await getSession()
+  const schoolId = session!.school_id
+
   const { data: submissions } = await supabase
     .from('submissions')
-    .select('*, roster!submissions_student_id_fkey(name, grade), chapter_activities(title, activity_number, data, lessons(id, title), lesson_chapters(chapter_number))')
+    .select('*, roster!submissions_student_id_fkey!inner(name, grade, school_id), chapter_activities(title, activity_number, data, lessons(id, title), lesson_chapters(chapter_number))')
+    .eq('roster.school_id', schoolId)
     .order('submitted_at', { ascending: false })
     .limit(200)
 

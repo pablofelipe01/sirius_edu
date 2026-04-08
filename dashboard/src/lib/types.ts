@@ -14,13 +14,6 @@ export interface Lesson {
   is_active: boolean; created_by: string | null; created_at: string;
 }
 
-export interface Assignment {
-  id: string; lesson_id: string; school_id: string; grade: string; title: string;
-  description: string; instructions: string; deadline: string | null;
-  max_score: number; is_active: boolean; created_at: string;
-  lessons?: { title: string; subject_code: string };
-}
-
 export interface Submission {
   id: string; assignment_id: string; student_id: string; response: string; submitted_at: string;
   ai_feedback: string | null; ai_score: number | null; ai_model: string | null;

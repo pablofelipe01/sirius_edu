@@ -3,9 +3,8 @@ import '../../services/meshtastic_service.dart';
 import '../settings_screen.dart';
 import '../device_selection_screen.dart';
 import '../chat_screen.dart';
-import 'submissions_screen.dart';
+import '../student/lesson_screen.dart';
 import 'teacher_questions_screen.dart';
-import 'teacher_ai_screen.dart';
 
 class TeacherMainScreen extends StatefulWidget {
   final MeshtasticService meshService;
@@ -25,16 +24,17 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
   void initState() {
     super.initState();
     _screens = [
-      SubmissionsScreen(meshService: widget.meshService),
+      // El profesor ve las mismas lecciones que los alumnos (las que el creo en la web)
+      LessonScreen(meshService: widget.meshService, studentName: widget.teacherName),
       TeacherQuestionsScreen(meshService: widget.meshService, teacherName: widget.teacherName),
       ChatScreen(meshService: widget.meshService, userName: widget.teacherName),
-      TeacherAIScreen(meshService: widget.meshService, teacherName: widget.teacherName),
       SettingsScreen(
         meshService: widget.meshService,
         onDeviceChange: _goToDeviceSelection,
         onDisconnect: _goToDeviceSelection,
       ),
     ];
+    widget.meshService.loadLocalData();
   }
 
   void _goToDeviceSelection() {
@@ -75,14 +75,7 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
           selectedIndex: _currentIndex,
           onDestinationSelected: (i) => setState(() => _currentIndex = i),
           destinations: [
-            NavigationDestination(
-              icon: Badge(
-                label: Text('${widget.meshService.submissions.length}'),
-                isLabelVisible: widget.meshService.submissions.isNotEmpty,
-                child: const Icon(Icons.grading),
-              ),
-              label: 'Entregas',
-            ),
+            const NavigationDestination(icon: Icon(Icons.menu_book), label: 'Lecciones'),
             NavigationDestination(
               icon: Badge(
                 label: Text('${widget.meshService.pendingQuestions.length}'),
@@ -99,7 +92,6 @@ class _TeacherMainScreenState extends State<TeacherMainScreen> {
               ),
               label: 'Chat',
             ),
-            const NavigationDestination(icon: Icon(Icons.smart_toy), label: 'IA'),
             const NavigationDestination(icon: Icon(Icons.settings), label: 'Ajustes'),
           ],
         ),

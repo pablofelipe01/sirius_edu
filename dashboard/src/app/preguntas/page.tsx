@@ -15,7 +15,7 @@ export default function PreguntasPage() {
   async function loadQuestions() {
     const { data } = await supabase
       .from('student_questions')
-      .select('*, roster(name, grade)')
+      .select('*, roster!student_questions_student_id_fkey(name, grade)')
       .order('created_at', { ascending: false })
       .limit(50)
     setQuestions((data || []) as StudentQuestion[])

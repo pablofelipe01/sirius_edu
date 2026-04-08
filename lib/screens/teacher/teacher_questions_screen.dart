@@ -69,30 +69,60 @@ class _TeacherQuestionsScreenState extends State<TeacherQuestionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final questions = widget.meshService.pendingQuestions;
-
-    if (questions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return ListenableBuilder(
+      listenable: widget.meshService,
+      builder: (context, _) {
+        final questions = widget.meshService.pendingQuestions;
+        return Column(
           children: [
-            Icon(Icons.check_circle, size: 64, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            const Text('No hay preguntas pendientes',
-                style: TextStyle(fontSize: 18, color: Color(0xFF7F8C8D))),
-            const SizedBox(height: 16),
-            _syncing
-                ? const CircularProgressIndicator(color: Color(0xFF2980B9))
-                : OutlinedButton.icon(
-                    onPressed: _requestQuestions,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Buscar preguntas'),
-                  ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                children: [
+                  const Text('Preguntas',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF2C3E50))),
+                  const Spacer(),
+                  if (_syncing)
+                    const SizedBox(width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2980B9)))
+                  else
+                    IconButton(
+                      onPressed: _requestQuestions,
+                      icon: const Icon(Icons.refresh, color: Color(0xFF2980B9)),
+                      tooltip: 'Buscar preguntas',
+                    ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: questions.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle, size: 64, color: Colors.grey.shade300),
+                          const SizedBox(height: 16),
+                          const Text('No hay preguntas pendientes',
+                              style: TextStyle(fontSize: 18, color: Color(0xFF7F8C8D))),
+                          const SizedBox(height: 16),
+                          if (!_syncing)
+                            OutlinedButton.icon(
+                              onPressed: _requestQuestions,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Buscar preguntas'),
+                            ),
+                        ],
+                      ),
+                    )
+                  : _buildQuestionsList(questions),
+            ),
           ],
-        ),
-      );
-    }
+        );
+      },
+    );
+  }
 
+  Widget _buildQuestionsList(List<Map<String, String>> questions) {
     return ListView.builder(
       padding: const EdgeInsets.all(12),
       itemCount: questions.length,
@@ -154,3 +184,4 @@ class _TeacherQuestionsScreenState extends State<TeacherQuestionsScreen> {
     );
   }
 }
+

@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation'
 const nav = [
   { href: '/', label: 'Dashboard', icon: '📊' },
   { href: '/lecciones', label: 'Lecciones', icon: '📖' },
-  { href: '/tareas', label: 'Tareas', icon: '📝' },
   { href: '/alumnos', label: 'Alumnos', icon: '👩‍🎓' },
+  { href: '/entregas', label: 'Entregas', icon: '✅' },
   { href: '/preguntas', label: 'Preguntas', icon: '❓' },
   { href: '/asistente', label: 'Asistente IA', icon: '🤖' },
 ]

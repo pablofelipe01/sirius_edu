@@ -4,7 +4,6 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/student_profile.dart';
 import '../models/lesson.dart';
-import '../models/assignment.dart';
 import '../models/submission.dart';
 
 /// Servicio de almacenamiento local SQLite para la app Flutter.
@@ -135,38 +134,6 @@ class LocalStorageService {
     await db.delete('assignments');
     await db.delete('submissions');
     await db.delete('ai_conversations');
-  }
-
-  // --- Assignments ---
-
-  Future<void> saveAssignment(Assignment assignment) async {
-    final db = await database;
-    await db.insert(
-      'assignments',
-      {'id': assignment.id, 'data': jsonEncode(assignment.toJson())},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<List<Assignment>> getAssignments({String? studentId}) async {
-    final db = await database;
-    final results = await db.query('assignments', orderBy: 'rowid DESC');
-    final assignments = results
-        .map((r) => Assignment.fromJson(jsonDecode(r['data'] as String)))
-        .toList();
-    if (studentId != null) {
-      return assignments
-          .where((a) => a.studentId == null || a.studentId == studentId)
-          .toList();
-    }
-    return assignments;
-  }
-
-  Future<Assignment?> getAssignment(String id) async {
-    final db = await database;
-    final results = await db.query('assignments', where: 'id = ?', whereArgs: [id]);
-    if (results.isEmpty) return null;
-    return Assignment.fromJson(jsonDecode(results.first['data'] as String));
   }
 
   // --- Submissions ---

@@ -3,8 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/meshtastic_service.dart';
 import 'student/student_main_screen.dart';
 import 'teacher/teacher_main_screen.dart';
-import 'parent/parent_main_screen.dart';
-import 'supervisor/dashboard_screen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   final MeshtasticService meshService;
@@ -70,10 +68,6 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
         roleScreen = StudentMainScreen(meshService: widget.meshService, studentName: name);
       case 'teacher':
         roleScreen = TeacherMainScreen(meshService: widget.meshService, teacherName: name);
-      case 'parent':
-        roleScreen = ParentMainScreen(meshService: widget.meshService, parentName: name);
-      case 'supervisor':
-        roleScreen = DashboardScreen(meshService: widget.meshService);
       default:
         return;
     }
@@ -141,14 +135,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                         desc: 'Aprende con lecciones y tutor IA', color: const Color(0xFF27AE60),
                         onTap: () => _selectRole('student')),
                     _RoleCard(icon: Icons.school, title: 'Profesor',
-                        desc: 'Crea lecciones y evalua alumnos', color: const Color(0xFF2980B9),
+                        desc: 'Revisa lecciones y responde preguntas', color: const Color(0xFF2980B9),
                         onTap: () => _selectRole('teacher')),
-                    _RoleCard(icon: Icons.family_restroom, title: 'Padre',
-                        desc: 'Ve el progreso de tu hijo', color: const Color(0xFFE67E22),
-                        onTap: () => _selectRole('parent')),
-                    _RoleCard(icon: Icons.dashboard, title: 'Supervisor',
-                        desc: 'Monitorea todos los salones', color: const Color(0xFF8E44AD),
-                        onTap: () => _selectRole('supervisor')),
                   ],
                 ),
               ),

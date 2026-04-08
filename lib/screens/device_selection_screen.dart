@@ -6,8 +6,6 @@ import '../services/meshtastic_service.dart';
 import '../widgets/battery_indicator.dart';
 import 'student/student_main_screen.dart';
 import 'teacher/teacher_main_screen.dart';
-import 'parent/parent_main_screen.dart';
-import 'supervisor/dashboard_screen.dart';
 
 /// Flujo: Escanear → Conectar → Settings (info nodo) → Continuar →
 ///   ROSTER_REQ al gateway → Identifica rol por node_id → PIN si aplica → Pantalla del rol
@@ -39,8 +37,6 @@ class _DeviceSelectionScreenState extends State<DeviceSelectionScreen> {
   String? _userId;
   String? _userName;
   String? _userRole;
-  String? _userGrade;
-  String? _childId;
   bool _needsPin = false;
   final _pinController = TextEditingController();
   String? _pinError;
@@ -183,8 +179,6 @@ class _DeviceSelectionScreenState extends State<DeviceSelectionScreen> {
     _userId = parts[1];
     _userName = parts.length > 2 ? parts[2] : '';
     _userRole = parts.length > 3 ? parts[3] : '';
-    _userGrade = parts.length > 4 ? parts[4] : '';
-    _childId = parts.length > 5 ? parts[5] : '';
     _needsPin = parts.length > 6 && parts[6] == '1';
 
     if (_needsPin) {
@@ -221,10 +215,6 @@ class _DeviceSelectionScreenState extends State<DeviceSelectionScreen> {
         screen = StudentMainScreen(meshService: widget.meshService, studentName: _userName ?? '');
       case 'teacher':
         screen = TeacherMainScreen(meshService: widget.meshService, teacherName: _userName ?? '');
-      case 'parent':
-        screen = ParentMainScreen(meshService: widget.meshService, parentName: _userName ?? '');
-      case 'supervisor':
-        screen = DashboardScreen(meshService: widget.meshService);
       default:
         screen = widget.nextScreen;
     }

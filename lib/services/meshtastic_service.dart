@@ -8,7 +8,6 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../models/chat_message.dart';
 import '../models/lesson.dart';
-import '../models/assignment.dart';
 import '../models/submission.dart';
 import '../models/lesson_chapter.dart';
 import '../models/chapter_activity.dart';
@@ -38,7 +37,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
 
   Lesson? _activeLesson;
   final List<Lesson> _lessons = [];
-  List<Assignment> _assignments = [];
   final List<Submission> _submissions = [];
 
   // Rate limiting para sync requests
@@ -59,10 +57,8 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   // --- Streams ---
   final _messageController = StreamController<ChatMessage>.broadcast();
   final _lessonController = StreamController<Lesson>.broadcast();
-  final _assignmentController = StreamController<Assignment>.broadcast();
   final _evaluationController = StreamController<Map<String, dynamic>>.broadcast();
   final _aiResponseController = StreamController<Map<String, String>>.broadcast();
-  final _lessonStepController = StreamController<Map<String, dynamic>>.broadcast();
   final _chapterController = StreamController<LessonChapter>.broadcast();
   final _activityController = StreamController<ChapterActivity>.broadcast();
   final _pendingQuestionController = StreamController<Map<String, String>>.broadcast();
@@ -81,7 +77,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   String? get errorMessage => _errorMessage;
   Lesson? get activeLesson => _activeLesson;
   List<Lesson> get lessons => _lessons;
-  List<Assignment> get assignments => _assignments;
   List<Submission> get submissions => _submissions;
   MeshtasticClient get client => _client;
   LocalStorageService get storage => _storage;
@@ -89,10 +84,8 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
 
   Stream<ChatMessage> get messageStream => _messageController.stream;
   Stream<Lesson> get lessonStream => _lessonController.stream;
-  Stream<Assignment> get assignmentStream => _assignmentController.stream;
   Stream<Map<String, dynamic>> get evaluationStream => _evaluationController.stream;
   Stream<Map<String, String>> get aiResponseStream => _aiResponseController.stream;
-  Stream<Map<String, dynamic>> get lessonStepStream => _lessonStepController.stream;
   Stream<LessonChapter> get chapterStream => _chapterController.stream;
   Stream<ChapterActivity> get activityStream => _activityController.stream;
   Stream<Map<String, String>> get pendingQuestionStream => _pendingQuestionController.stream;
@@ -332,8 +325,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
       _handleAIResponse(text);
     } else if (text.startsWith('LECCION|') || text.startsWith('LECCION_FULL|')) {
       _handleLessonMessage(text);
-    } else if (text.startsWith('TAREA|')) {
-      _handleAssignmentMessage(text);
     } else if (text.startsWith('EVAL_IA|')) {
       _handleAIEvaluation(text);
     } else if (text.startsWith('SYNC_RES|')) {
@@ -345,8 +336,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     } else if (text.startsWith('TEST_OK|')) {
       _syncStatusController.add('TEST_OK');
       notifyListeners();
-    } else if (text.startsWith('LECCION_PASO|')) {
-      _handleLessonStep(text);
     } else if (text.startsWith('SYNC_END|')) {
       _syncStatusController.add(text);
       notifyListeners();
@@ -418,35 +407,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  void _handleLessonStep(String text) {
-    // LECCION_PASO|lesson_id|step_num|total|content
-    final parts = text.split('|');
-    if (parts.length < 5) return;
-    _lessonStepController.add({
-      'lesson_id': parts[1],
-      'step': int.tryParse(parts[2]) ?? 0,
-      'total': int.tryParse(parts[3]) ?? 0,
-      'content': parts.sublist(4).join('|'),
-    });
-  }
-
-  void _handleAssignmentMessage(String text) {
-    final parts = text.split('|');
-    if (parts.length < 4) return;
-    final assignment = Assignment(
-      id: parts[1], studentId: parts[2], description: parts[3],
-      deadline: parts.length > 4 && parts[4].isNotEmpty ? DateTime.tryParse(parts[4]) : null,
-    );
-    final existingIndex = _assignments.indexWhere((a) => a.id == assignment.id);
-    if (existingIndex >= 0) {
-      _assignments[existingIndex] = assignment;
-    } else {
-      _assignments.add(assignment);
-    }
-    _storage.saveAssignment(assignment);
-    _assignmentController.add(assignment);
-    notifyListeners();
-  }
 
   void _handleAIEvaluation(String text) {
     final parts = text.split('|');
@@ -606,29 +566,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     await sendToGateway('ENTREGA|$assignmentId|$studentId|$response');
   }
 
-  Future<void> sendLesson(Lesson lesson) async {
-    await sendMessage('LECCION|${lesson.id}|${lesson.subject}|${lesson.grade}|${lesson.title}|${lesson.summary}');
-  }
-
-  Future<void> sendAssignment(Assignment assignment, int studentNodeId) async {
-    final deadline = assignment.deadline?.toIso8601String() ?? '';
-    await sendMessage('TAREA|${assignment.id}|${assignment.studentId ?? ''}|${assignment.description}|$deadline',
-        destinationId: studentNodeId);
-  }
-
-  Future<void> sendTeacherEvaluation(String assignmentId, String studentId, String criteria, String grade) async {
-    await sendToGateway('EVAL_PROF|$assignmentId|$studentId|$criteria|$grade');
-  }
-
-  Future<void> sendProfileUpdate(String studentId, String field, String value) async {
-    await sendToGateway('PERFIL_UPDATE|$studentId|$field|$value');
-  }
-
-  /// Pedir un paso específico de una lección (legacy)
-  Future<void> requestLessonStep(String lessonId, int stepNum) async {
-    await sendToGateway('SYNC_REQ|lesson_step|$lessonId|$stepNum');
-  }
-
   /// Pedir un capítulo de una lección
   Future<void> requestChapter(String lessonId, int chapterNum) async {
     await sendToGateway('SYNC_REQ|chapter|$lessonId|$chapterNum');
@@ -663,8 +600,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
       _lessons.clear();
       _activeLesson = null;
       await _storage.clearLessons();
-    } else if (tipo == 'assignments') {
-      _assignments.clear();
     } else if (tipo == 'submissions') {
       _submissions.clear();
     } else if (tipo == 'questions') {
@@ -680,7 +615,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> clearLocalCache() async {
     _lessons.clear();
     _activeLesson = null;
-    _assignments.clear();
     _submissions.clear();
     _pendingQuestions.clear();
     _lastSyncTime.clear();
@@ -720,7 +654,6 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> loadLocalData() async {
     _activeLesson = await _storage.getActiveLesson();
-    _assignments = await _storage.getAssignments();
     final storedLessons = await _storage.getAllLessons();
     _lessons.clear();
     _lessons.addAll(storedLessons);
@@ -737,10 +670,8 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
     _reconnectTimer?.cancel();
     _messageController.close();
     _lessonController.close();
-    _assignmentController.close();
     _evaluationController.close();
     _aiResponseController.close();
-    _lessonStepController.close();
     _chapterController.close();
     _activityController.close();
     _pendingQuestionController.close();

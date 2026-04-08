@@ -657,8 +657,35 @@ class MeshtasticService extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     _lastSyncTime[tipo] = now;
+
+    // Clear local data before fresh sync
+    if (tipo == 'lessons') {
+      _lessons.clear();
+      _activeLesson = null;
+      await _storage.clearLessons();
+    } else if (tipo == 'assignments') {
+      _assignments.clear();
+    } else if (tipo == 'submissions') {
+      _submissions.clear();
+    } else if (tipo == 'questions') {
+      _pendingQuestions.clear();
+    }
+    notifyListeners();
+
     final msg = extra != null ? 'SYNC_REQ|$tipo|$extra' : 'SYNC_REQ|$tipo';
     await sendToGateway(msg);
+  }
+
+  /// Limpiar todo el cache local
+  Future<void> clearLocalCache() async {
+    _lessons.clear();
+    _activeLesson = null;
+    _assignments.clear();
+    _submissions.clear();
+    _pendingQuestions.clear();
+    _lastSyncTime.clear();
+    await _storage.clearAll();
+    notifyListeners();
   }
 
   /// Alumno pregunta al profesor (va a Supabase)

@@ -364,6 +364,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       label: const Text('Cambiar nodo'),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Limpiar cache local'),
+                            content: const Text('Esto borrara las lecciones, tareas y entregas guardadas localmente. Despues podras volver a sincronizar desde el gateway.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                style: TextButton.styleFrom(foregroundColor: const Color(0xFFE74C3C)),
+                                child: const Text('Limpiar'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true && context.mounted) {
+                          await _service.clearLocalCache();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Cache local limpiado'), backgroundColor: Color(0xFF27AE60)),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.cleaning_services, size: 18, color: Color(0xFFE67E22)),
+                      label: const Text('Limpiar cache local', style: TextStyle(color: Color(0xFFE67E22))),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -374,7 +407,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Version
           Center(
             child: Text(
-              'Sirius Edu v1.0.0\nInverse Neural Lab',
+              'Sirius Edu v4.0.0\nInverse Neural Lab',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
             ),

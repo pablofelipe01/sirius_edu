@@ -124,6 +124,19 @@ class LocalStorageService {
         .toList();
   }
 
+  Future<void> clearLessons() async {
+    final db = await database;
+    await db.delete('lessons');
+  }
+
+  Future<void> clearAll() async {
+    final db = await database;
+    await db.delete('lessons');
+    await db.delete('assignments');
+    await db.delete('submissions');
+    await db.delete('ai_conversations');
+  }
+
   // --- Assignments ---
 
   Future<void> saveAssignment(Assignment assignment) async {

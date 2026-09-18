@@ -53,3 +53,6 @@ app.*.map.json
 dashboard/.env.local
 dashboard/.next/
 dashboard/node_modules/
+
+# builds de Android (pesan 50MB c/u; van en Releases, no en git)
+versions/*.apk
